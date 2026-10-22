@@ -143,7 +143,9 @@ class _SplashScreenState extends State<SplashScreen> {
       ));
 
       await _yieldFrame();
-      _mediaImportProvider = MediaImportProvider();
+      _mediaImportProvider = MediaImportProvider(
+        callAI: (prompt) => _settingsProvider!.aiService.callAI(prompt),
+      );
 
       await _yieldFrame();
       _backgroundSummaryProvider = BackgroundSummaryProvider();
