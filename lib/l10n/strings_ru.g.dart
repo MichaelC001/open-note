@@ -1755,4 +1755,41 @@ class TranslationsRu extends Translations with BaseTranslations<AppLocale, Trans
 
 	/// Заголовок диалога выбора формата экспорта
 	@override String get export_select_format => 'Выберите формат экспорта';
+
+	@override String get home_videoToNote => 'Видео в заметку';
+	@override String get media_import_title => 'Видео в заметку';
+	@override String get media_source_url => 'Импорт по URL';
+	@override String get media_source_file => 'Импорт из локального файла';
+	@override String get media_source_urlHint => 'Введите URL страницы с видео/аудио';
+	@override String get media_source_unsupported => 'Неподдерживаемый формат медиафайла';
+	@override String get media_env_ready => 'Готово';
+	@override String get media_env_missing => 'Не установлено';
+	@override String get media_env_download => 'Скачать portable-версию';
+	@override String get media_env_downloadModel => 'Скачать модель';
+	@override String get media_env_copied => 'Команда установки скопирована';
+	@override String get media_env_model => 'Модель';
+	@override String get media_confirm_next => 'Далее';
+	@override String get media_confirm_model => 'Модель';
+	@override String get media_confirm_language => 'Язык';
+	@override String get media_confirm_auto => 'Автоопределение';
+	@override String media_confirm_disk({required Object sizeMb}) => 'Потребуется около \$${sizeMb} МБ на диске';
+	@override String get media_confirm_start => 'Начать';
+	@override String get media_proc_prepare => 'Подготовка…';
+	@override String get media_proc_acquire => 'Скачивание медиа…';
+	@override String get media_proc_audio => 'Извлечение аудиодорожки…';
+	@override String get media_proc_transcribe => 'Распознавание речи…';
+	@override String get media_proc_format => 'Форматирование ИИ…';
+	@override String get media_proc_cancel => 'Отмена';
+	@override String get media_error_back => 'Назад';
+	@override String get media_done_fallback => 'ИИ-форматирование не выполнено, сохранена исходная расшифровка';
+	@override String get media_done_open => 'Открыть заметку';
+	@override String get media_done_again => 'Конвертировать ещё';
+	@override String get media_settings_title => 'Видео в заметку';
+	@override String get media_settings_source => 'Источник загрузки';
+	@override String get media_settings_sourceAuto => 'Авто (напрямую + зеркало)';
+	@override String get media_settings_sourceDirect => 'Только напрямую';
+	@override String get media_settings_sourceMirror => 'Сначала зеркало';
+	@override String get media_settings_defaultModel => 'Модель по умолчанию';
+	@override String get media_settings_defaultModelAuto => 'Автоподбор';
+	@override String get media_settings_deleteSource => 'Удалять скачанное медиа после завершения';
 }

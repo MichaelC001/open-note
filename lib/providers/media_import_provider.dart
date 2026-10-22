@@ -63,6 +63,8 @@ class MediaImportProvider extends ChangeNotifier {
 
   bool get busy => _busy;
 
+  String pendingLanguage = 'auto';
+
   bool isToolRequired(MediaToolKind kind) =>
       kind != MediaToolKind.ytDlp || sourceKind == ImportSourceKind.url;
 
@@ -285,6 +287,26 @@ class MediaImportProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
+  void gotoConfirm() {
+    step = MediaImportStep.confirm;
+    notifyListeners();
+  }
+
+  void selectTier(WhisperModelTier tier) {
+    selectedTier = tier;
+    notifyListeners();
+  }
+
+  Future<void> startProcessing({
+    String language = 'auto',
+    required Future<String?> Function(MediaImportResult result) saveNote,
+  }) async {
+    pendingLanguage = language;
+    step = MediaImportStep.processing;
+    notifyListeners();
+    await confirmAndStart(saveNote: saveNote);
+  }
+
   Future<void> confirmAndStart({
     required Future<String?> Function(MediaImportResult result) saveNote,
     Future<MediaImportResult> Function(
@@ -314,7 +336,7 @@ class MediaImportProvider extends ChangeNotifier {
       url: sourceKind == ImportSourceKind.url ? urlInput : null,
       localFile: sourceKind == ImportSourceKind.file ? pickedFile : null,
       tier: selectedTier,
-      language: 'auto',
+      language: pendingLanguage,
       deleteSourceAfter: await settings.deleteSourceAfter(),
     );
 

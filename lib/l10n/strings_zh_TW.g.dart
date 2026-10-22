@@ -1755,4 +1755,41 @@ class TranslationsZhTw extends Translations with BaseTranslations<AppLocale, Tra
 
 	/// 選擇匯出格式對話框標題
 	@override String get export_select_format => '選擇匯出格式';
+
+	@override String get home_videoToNote => '影片轉筆記';
+	@override String get media_import_title => '影片轉筆記';
+	@override String get media_source_url => '從 URL 匯入';
+	@override String get media_source_file => '從本機檔案匯入';
+	@override String get media_source_urlHint => '請輸入影片/音訊頁面 URL';
+	@override String get media_source_unsupported => '不支援的媒體檔案格式';
+	@override String get media_env_ready => '已就緒';
+	@override String get media_env_missing => '未安裝';
+	@override String get media_env_download => '下載便攜版';
+	@override String get media_env_downloadModel => '下載模型';
+	@override String get media_env_copied => '安裝指令已複製';
+	@override String get media_env_model => '辨識模型';
+	@override String get media_confirm_next => '下一步';
+	@override String get media_confirm_model => '辨識模型';
+	@override String get media_confirm_language => '辨識語言';
+	@override String get media_confirm_auto => '自動偵測';
+	@override String media_confirm_disk({required Object sizeMb}) => '預計需 \$${sizeMb} MB 磁碟空間';
+	@override String get media_confirm_start => '開始轉換';
+	@override String get media_proc_prepare => '準備中…';
+	@override String get media_proc_acquire => '下載媒體中…';
+	@override String get media_proc_audio => '擷取音軌…';
+	@override String get media_proc_transcribe => '語音辨識中…';
+	@override String get media_proc_format => 'AI 格式化中…';
+	@override String get media_proc_cancel => '取消';
+	@override String get media_error_back => '返回';
+	@override String get media_done_fallback => 'AI 格式化未完成，已保存原始轉錄文字';
+	@override String get media_done_open => '開啟筆記';
+	@override String get media_done_again => '再轉一個';
+	@override String get media_settings_title => '影片轉筆記';
+	@override String get media_settings_source => '下載來源';
+	@override String get media_settings_sourceAuto => '自動（直連+鏡像回退）';
+	@override String get media_settings_sourceDirect => '僅直連';
+	@override String get media_settings_sourceMirror => '鏡像優先';
+	@override String get media_settings_defaultModel => '預設辨識模型';
+	@override String get media_settings_defaultModelAuto => '自動推薦';
+	@override String get media_settings_deleteSource => '完成後刪除下載的原始媒體';
 }

@@ -2915,4 +2915,112 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 	///
 	/// zh: '选择导出格式'
 	String get export_select_format => '选择导出格式';
+
+	/// zh: '视频转笔记'
+	String get home_videoToNote => '视频转笔记';
+
+	/// zh: '视频转笔记'
+	String get media_import_title => '视频转笔记';
+
+	/// zh: '从 URL 导入'
+	String get media_source_url => '从 URL 导入';
+
+	/// zh: '从本地文件导入'
+	String get media_source_file => '从本地文件导入';
+
+	/// zh: '请输入视频/音频页面 URL'
+	String get media_source_urlHint => '请输入视频/音频页面 URL';
+
+	/// zh: '不支持的媒体文件格式'
+	String get media_source_unsupported => '不支持的媒体文件格式';
+
+	/// zh: '已就绪'
+	String get media_env_ready => '已就绪';
+
+	/// zh: '未安装'
+	String get media_env_missing => '未安装';
+
+	/// zh: '下载便携版'
+	String get media_env_download => '下载便携版';
+
+	/// zh: '下载模型'
+	String get media_env_downloadModel => '下载模型';
+
+	/// zh: '安装命令已复制'
+	String get media_env_copied => '安装命令已复制';
+
+	/// zh: '识别模型'
+	String get media_env_model => '识别模型';
+
+	/// zh: '下一步'
+	String get media_confirm_next => '下一步';
+
+	/// zh: '识别模型'
+	String get media_confirm_model => '识别模型';
+
+	/// zh: '识别语言'
+	String get media_confirm_language => '识别语言';
+
+	/// zh: '自动检测'
+	String get media_confirm_auto => '自动检测';
+
+	/// zh: '预计需 ${sizeMb} MB 磁盘空间'
+	String media_confirm_disk({required Object sizeMb}) => '预计需 \$${sizeMb} MB 磁盘空间';
+
+	/// zh: '开始转换'
+	String get media_confirm_start => '开始转换';
+
+	/// zh: '准备中…'
+	String get media_proc_prepare => '准备中…';
+
+	/// zh: '下载媒体中…'
+	String get media_proc_acquire => '下载媒体中…';
+
+	/// zh: '提取音轨…'
+	String get media_proc_audio => '提取音轨…';
+
+	/// zh: '语音识别中…'
+	String get media_proc_transcribe => '语音识别中…';
+
+	/// zh: 'AI 格式化中…'
+	String get media_proc_format => 'AI 格式化中…';
+
+	/// zh: '取消'
+	String get media_proc_cancel => '取消';
+
+	/// zh: '返回'
+	String get media_error_back => '返回';
+
+	/// zh: 'AI 格式化未完成，已保存原始转录文本'
+	String get media_done_fallback => 'AI 格式化未完成，已保存原始转录文本';
+
+	/// zh: '打开笔记'
+	String get media_done_open => '打开笔记';
+
+	/// zh: '再转一个'
+	String get media_done_again => '再转一个';
+
+	/// zh: '视频转笔记'
+	String get media_settings_title => '视频转笔记';
+
+	/// zh: '下载源'
+	String get media_settings_source => '下载源';
+
+	/// zh: '自动（直连+镜像回退）'
+	String get media_settings_sourceAuto => '自动（直连+镜像回退）';
+
+	/// zh: '仅直连'
+	String get media_settings_sourceDirect => '仅直连';
+
+	/// zh: '镜像优先'
+	String get media_settings_sourceMirror => '镜像优先';
+
+	/// zh: '默认识别模型'
+	String get media_settings_defaultModel => '默认识别模型';
+
+	/// zh: '自动推荐'
+	String get media_settings_defaultModelAuto => '自动推荐';
+
+	/// zh: '完成后删除下载的源媒体'
+	String get media_settings_deleteSource => '完成后删除下载的源媒体';
 }

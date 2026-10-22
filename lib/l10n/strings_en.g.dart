@@ -1761,4 +1761,41 @@ class TranslationsEn extends Translations with BaseTranslations<AppLocale, Trans
 
 	/// Select export format dialog title
 	@override String get export_select_format => 'Select Export Format';
+
+	@override String get home_videoToNote => 'Video to Note';
+	@override String get media_import_title => 'Video to Note';
+	@override String get media_source_url => 'Import from URL';
+	@override String get media_source_file => 'Import from local file';
+	@override String get media_source_urlHint => 'Enter a video/audio page URL';
+	@override String get media_source_unsupported => 'Unsupported media file format';
+	@override String get media_env_ready => 'Ready';
+	@override String get media_env_missing => 'Not installed';
+	@override String get media_env_download => 'Download portable build';
+	@override String get media_env_downloadModel => 'Download model';
+	@override String get media_env_copied => 'Install command copied';
+	@override String get media_env_model => 'Model';
+	@override String get media_confirm_next => 'Next';
+	@override String get media_confirm_model => 'Model';
+	@override String get media_confirm_language => 'Language';
+	@override String get media_confirm_auto => 'Auto detect';
+	@override String media_confirm_disk({required Object sizeMb}) => 'About \$${sizeMb} MB of disk space required';
+	@override String get media_confirm_start => 'Start';
+	@override String get media_proc_prepare => 'Preparing…';
+	@override String get media_proc_acquire => 'Downloading media…';
+	@override String get media_proc_audio => 'Extracting audio…';
+	@override String get media_proc_transcribe => 'Transcribing…';
+	@override String get media_proc_format => 'Formatting with AI…';
+	@override String get media_proc_cancel => 'Cancel';
+	@override String get media_error_back => 'Back';
+	@override String get media_done_fallback => 'AI formatting failed; raw transcript saved';
+	@override String get media_done_open => 'Open note';
+	@override String get media_done_again => 'Convert another';
+	@override String get media_settings_title => 'Video to Note';
+	@override String get media_settings_source => 'Download source';
+	@override String get media_settings_sourceAuto => 'Auto (direct + mirror fallback)';
+	@override String get media_settings_sourceDirect => 'Direct only';
+	@override String get media_settings_sourceMirror => 'Mirror first';
+	@override String get media_settings_defaultModel => 'Default model';
+	@override String get media_settings_defaultModelAuto => 'Auto recommend';
+	@override String get media_settings_deleteSource => 'Delete downloaded media after completion';
 }

@@ -23,6 +23,7 @@ import '../models/category.dart';
 import '../services/clipboard_service.dart';
 import '../widgets/url_input_dialog.dart';
 import '../widgets/search_dialog.dart';
+import '../widgets/media_import/media_import_dialog.dart';
 import '../utils/responsive.dart';
 import '../utils/snackbar_helper.dart';
 import '../theme/design_tokens.dart';
@@ -306,6 +307,31 @@ class _HomeScreenState extends State<HomeScreen> with ClipboardListener {
           );
         },
       ),
+    );
+  }
+
+  void _showMediaImportDialog() {
+    MediaImportDialog.show(
+      context,
+      onOpenNote: (noteId) async {
+        final notesProvider = context.read<NotesProvider>();
+        final fullNote = await notesProvider.getFullNote(noteId);
+        if (fullNote != null && mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (ctx) =>
+                  EditorScreen(note: fullNote, startInEditMode: false),
+            ),
+          );
+        }
+      },
+      onSaveNote: (r) => context.read<NotesProvider>().createNote(
+            title: r.title,
+            content: r.markdown,
+            sourceType: NoteSourceType.video,
+            sourceUrl: r.sourceUrl,
+          ),
     );
   }
 
@@ -1005,6 +1031,31 @@ class _HomeScreenState extends State<HomeScreen> with ClipboardListener {
                         ],
                       ),
                     ),
+                    PopupMenuItem(
+                      value: 'video',
+                      height: 40,
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.smart_display,
+                            size: 18,
+                            color: isDark
+                                ? DesignTokens.darkPrimary500
+                                : DesignTokens.primary500,
+                          ),
+                          SizedBox(width: DesignTokens.space3),
+                          Text(
+                            t.home_videoToNote,
+                            style: TextStyle(
+                              fontSize: DesignTokens.fontSizeBody,
+                              color: isDark
+                                  ? DesignTokens.darkTextPrimary
+                                  : DesignTokens.gray700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                   onSelected: (value) {
                     if (value == 'new') {
@@ -1013,6 +1064,8 @@ class _HomeScreenState extends State<HomeScreen> with ClipboardListener {
                       _showUrlInputDialog(context);
                     } else if (value == 'file') {
                       _showImportFileDialog(context);
+                    } else if (value == 'video') {
+                      _showMediaImportDialog();
                     }
                   },
                 ),
