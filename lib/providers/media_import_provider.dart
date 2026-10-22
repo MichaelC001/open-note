@@ -7,6 +7,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
+import '../services/media/download_stats.dart';
 import '../services/media/media_downloader.dart';
 import '../services/media/media_import_service.dart';
 import '../services/media/media_import_settings.dart';
@@ -49,13 +50,15 @@ class MediaImportProvider extends ChangeNotifier {
   final Map<MediaToolKind, MediaToolStatus> toolStatuses = {};
   final Map<MediaToolKind, bool> toolDownloading = {};
   final Map<MediaToolKind, bool> toolInstalling = {};
-  final Map<MediaToolKind, double> toolProgress = {};
+  final Map<MediaToolKind, DownloadStatus> toolDownloadStatus = {};
+  final Map<String, DownloadSpeedTracker> _downloadTrackers = {};
 
   WhisperModelTier recommendedTier = WhisperModelTier.medium;
   WhisperModelTier selectedTier = WhisperModelTier.medium;
   final Set<WhisperModelTier> downloadedTiers = {};
   bool modelDownloading = false;
-  double modelProgress = 0;
+  DownloadStatus modelDownloadStatus = const DownloadStatus();
+  DownloadSpeedTracker? _modelTracker;
 
   MediaImportPhase? phase;
   double? phaseProgress;
@@ -134,7 +137,8 @@ class MediaImportProvider extends ChangeNotifier {
 
   Future<void> downloadTool(MediaToolKind kind) async {
     toolDownloading[kind] = true;
-    toolProgress[kind] = 0;
+    toolDownloadStatus[kind] = const DownloadStatus();
+    _downloadTrackers['tool:${kind.name}'] = DownloadSpeedTracker();
     errorMessage = null;
     _notify();
     try {
@@ -163,7 +167,8 @@ class MediaImportProvider extends ChangeNotifier {
           cancelToken: _downloadCancel,
           onProgress: (r, t) {
             if (t > 0) {
-              toolProgress[kind] = r / t;
+              toolDownloadStatus[kind] = _downloadTrackers['tool:${kind.name}']!
+                  .tick(r, t);
               _notify();
             }
           },
@@ -186,7 +191,8 @@ class MediaImportProvider extends ChangeNotifier {
           cancelToken: _downloadCancel,
           onProgress: (r, t) {
             if (t > 0) {
-              toolProgress[kind] = r / t;
+              toolDownloadStatus[kind] = _downloadTrackers['tool:${kind.name}']!
+                  .tick(r, t);
               _notify();
             }
           },
@@ -219,6 +225,7 @@ class MediaImportProvider extends ChangeNotifier {
     } finally {
       toolDownloading[kind] = false;
       _downloadCancel = null;
+      _downloadTrackers.remove('tool:${kind.name}');
       _notify();
     }
   }
@@ -289,7 +296,8 @@ class MediaImportProvider extends ChangeNotifier {
 
   Future<void> downloadSelectedModel() async {
     modelDownloading = true;
-    modelProgress = 0;
+    modelDownloadStatus = const DownloadStatus();
+    _modelTracker = DownloadSpeedTracker();
     errorMessage = null;
     _notify();
     try {
@@ -313,7 +321,7 @@ class MediaImportProvider extends ChangeNotifier {
         cancelToken: _downloadCancel,
         onProgress: (r, t) {
           if (t > 0) {
-            modelProgress = r / t;
+            modelDownloadStatus = _modelTracker!.tick(r, t);
             _notify();
           }
         },
@@ -325,6 +333,7 @@ class MediaImportProvider extends ChangeNotifier {
     } finally {
       modelDownloading = false;
       _downloadCancel = null;
+      _modelTracker = null;
       _notify();
     }
   }

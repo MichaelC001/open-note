@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_note/providers/media_import_provider.dart';
+import 'package:open_note/services/media/media_downloader.dart';
 import 'package:open_note/services/media/media_import_service.dart';
 import 'package:open_note/services/media/media_tool_service.dart';
 import 'package:open_note/services/media/whisper_model_service.dart';
@@ -10,22 +13,23 @@ import 'package:shared_preferences/shared_preferences.dart';
 class _ReadyToolService extends MediaToolService {
   int checkCount = 0;
   _ReadyToolService(Future<String> Function() base)
-      : super(resolveBaseDir: base);
+    : super(resolveBaseDir: base);
   @override
   Future<MediaToolStatus> check(MediaToolKind kind) async {
     checkCount++;
     return MediaToolStatus(
-        kind: kind,
-        ready: true,
-        path: 'fake',
-        version: '1',
-        source: MediaToolSource.appManaged);
+      kind: kind,
+      ready: true,
+      path: 'fake',
+      version: '1',
+      source: MediaToolSource.appManaged,
+    );
   }
 }
 
 class _AllModelsService extends WhisperModelService {
   _AllModelsService(Future<String> Function() base)
-      : super(resolveBaseDir: base);
+    : super(resolveBaseDir: base);
   @override
   Future<WhisperModelTier> recommendTierForDevice() async =>
       WhisperModelTier.largeV3Turbo;
@@ -43,9 +47,9 @@ void main() {
   tearDown(() => tmp.deleteSync(recursive: true));
 
   MediaImportProvider makeProvider() => MediaImportProvider(
-        toolService: _ReadyToolService(() async => tmp.path),
-        modelService: _AllModelsService(() async => tmp.path),
-      );
+    toolService: _ReadyToolService(() async => tmp.path),
+    modelService: _AllModelsService(() async => tmp.path),
+  );
 
   test('startForFile -> envCheck 且环境就绪', () async {
     final p = makeProvider();
@@ -72,7 +76,10 @@ void main() {
       runOverride: (_, _) async {
         await Future.delayed(const Duration(milliseconds: 10));
         return const MediaImportResult(
-            markdown: '# ok', title: 'T', formattedByAI: true);
+          markdown: '# ok',
+          title: 'T',
+          formattedByAI: true,
+        );
       },
       saveNote: (r) async {
         captured = r;
@@ -155,8 +162,7 @@ void main() {
       final p = MediaImportProvider(
         toolService: _ReadyToolService(() async => tmp.path),
         modelService: _AllModelsService(() async => tmp.path),
-        installerRunner: (exe, args) async =>
-            const ProcessRunResult(0, '', ''),
+        installerRunner: (exe, args) async => const ProcessRunResult(0, '', ''),
         brewPathResolver: () async => null,
       );
       await p.startForFile(File('${tmp.path}/a.mp4'));
@@ -167,4 +173,74 @@ void main() {
       expect(p.errorDetail, contains('Homebrew'));
     });
   });
+
+  group('下载进度状态（速度/百分比/ETA）', () {
+    test('downloadTool 进度回调更新 toolDownloadStatus', () async {
+      final fake = _HangingDownloader();
+      final p = MediaImportProvider(
+        toolService: _ReadyToolService(() async => tmp.path),
+        modelService: _AllModelsService(() async => tmp.path),
+        downloader: fake,
+      );
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+
+      final run = p.downloadTool(MediaToolKind.ytDlp);
+      await fake.started.future;
+      await Future.delayed(Duration.zero);
+
+      expect(p.toolDownloading[MediaToolKind.ytDlp] ?? false, isTrue);
+      final st = p.toolDownloadStatus[MediaToolKind.ytDlp];
+      expect(st, isNotNull);
+      expect(st!.progress, closeTo(0.5, 1e-9));
+      expect(st.speedBps, 0);
+      expect(st.etaSeconds, isNull);
+
+      fake.release.complete();
+      await run;
+      expect(p.toolDownloading[MediaToolKind.ytDlp] ?? false, isFalse);
+    });
+
+    test('downloadSelectedModel 进度回调更新 modelDownloadStatus', () async {
+      final fake = _HangingDownloader();
+      final p = MediaImportProvider(
+        toolService: _ReadyToolService(() async => tmp.path),
+        modelService: _AllModelsService(() async => tmp.path),
+        downloader: fake,
+      );
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+      p.downloadedTiers.clear();
+
+      final run = p.downloadSelectedModel();
+      await fake.started.future;
+      await Future.delayed(Duration.zero);
+
+      expect(p.modelDownloadStatus.progress, closeTo(0.5, 1e-9));
+
+      fake.release.complete();
+      await run;
+    });
+  });
+}
+
+class _HangingDownloader extends MediaDownloader {
+  final Completer<void> started = Completer<void>();
+  final Completer<void> release = Completer<void>();
+
+  _HangingDownloader();
+
+  @override
+  Future<File> download(
+    String directUrl, {
+    required File destFile,
+    MediaDownloadSourceMode mode = MediaDownloadSourceMode.auto,
+    void Function(int received, int total)? onProgress,
+    CancelToken? cancelToken,
+    String? expectedSha256,
+  }) async {
+    onProgress?.call(0, 1000);
+    onProgress?.call(500, 1000);
+    started.complete();
+    await release.future;
+    return destFile;
+  }
 }

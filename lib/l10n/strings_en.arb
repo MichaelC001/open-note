@@ -2355,6 +2355,8 @@
   "media_settings_sourceMirror": "Mirror first",
   "media_settings_defaultModel": "Default model",
   "media_settings_defaultModelAuto": "Auto recommend",
+  "media_dl_eta": "{time} left",
+  "@media_dl_eta": { "parameters": { "time": "String" } },
   "media_env_autoInstall": "Auto-install",
   "media_env_installing": "Installing…",
   "media_env_recheck": "Re-check",

@@ -3021,6 +3021,9 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 	/// zh: '自动推荐'
 	String get media_settings_defaultModelAuto => '自动推荐';
 
+	/// zh: '剩余 {time}'
+	String media_dl_eta({required Object time}) => '剩余 ${time}';
+
 	/// zh: '一键安装'
 	String get media_env_autoInstall => '一键安装';
 

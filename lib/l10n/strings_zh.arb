@@ -2355,6 +2355,8 @@
   "media_settings_sourceMirror": "镜像优先",
   "media_settings_defaultModel": "默认识别模型",
   "media_settings_defaultModelAuto": "自动推荐",
+  "media_dl_eta": "剩余 {time}",
+  "@media_dl_eta": { "parameters": { "time": "String" } },
   "media_env_autoInstall": "一键安装",
   "media_env_installing": "安装中…",
   "media_env_recheck": "重新检测",

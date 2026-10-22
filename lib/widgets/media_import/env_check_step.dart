@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../l10n/strings.g.dart';
 import '../../providers/media_import_provider.dart';
+import '../../services/media/download_stats.dart';
 import '../../services/media/media_tool_service.dart';
 import '../../services/media/whisper_model_service.dart';
 
@@ -70,13 +71,13 @@ class EnvCheckStep extends StatelessWidget {
               kind: kind,
               status: p.toolStatuses[kind],
               downloading: p.toolDownloading[kind] ?? false,
-              progress: p.toolProgress[kind] ?? 0,
+              downloadStatus: p.toolDownloadStatus[kind],
               autoInstalling: p.toolInstalling[kind] ?? false,
               guide: _installGuides[kind]![platformKey]!,
               onAutoInstall: _ToolTile.canAutoInstall(kind, platformKey)
-                  ? () => context
-                      .read<MediaImportProvider>()
-                      .autoInstallTool(kind)
+                  ? () => context.read<MediaImportProvider>().autoInstallTool(
+                      kind,
+                    )
                   : null,
             ),
           const Divider(height: 24),
@@ -100,7 +101,7 @@ class _ToolTile extends StatelessWidget {
   final MediaToolKind kind;
   final MediaToolStatus? status;
   final bool downloading;
-  final double progress;
+  final DownloadStatus? downloadStatus;
   final bool autoInstalling;
   final String guide;
   final VoidCallback? onAutoInstall;
@@ -109,7 +110,7 @@ class _ToolTile extends StatelessWidget {
     required this.kind,
     required this.status,
     required this.downloading,
-    required this.progress,
+    this.downloadStatus,
     required this.autoInstalling,
     required this.guide,
     this.onAutoInstall,
@@ -138,12 +139,16 @@ class _ToolTile extends StatelessWidget {
         MediaToolKind.ytDlp => 'yt-dlp',
         MediaToolKind.whisperCli => 'whisper.cpp',
       }),
-      subtitle: Text(
-        ready
-            ? '${t.media_env_ready} · v${status!.version ?? ''}'
-            : t.media_env_missing,
-      ),
-      trailing: ready
+      subtitle: downloading
+          ? _DownloadProgressText(
+              status: downloadStatus ?? const DownloadStatus(),
+            )
+          : Text(
+              ready
+                  ? '${t.media_env_ready} · v${status!.version ?? ''}'
+                  : t.media_env_missing,
+            ),
+      trailing: ready || downloading
           ? null
           : autoInstalling
           ? Row(
@@ -159,10 +164,7 @@ class _ToolTile extends StatelessWidget {
               ],
             )
           : downloading
-          ? SizedBox(
-              width: 120,
-              child: LinearProgressIndicator(value: progress),
-            )
+          ? null
           : Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -215,7 +217,7 @@ class _ModelSection extends StatelessWidget {
         '${t.media_env_model} · ${WhisperModelService.infoFor(p.selectedTier).displayLabel}',
       ),
       subtitle: p.modelDownloading
-          ? LinearProgressIndicator(value: p.modelProgress)
+          ? _DownloadProgressText(status: p.modelDownloadStatus)
           : Text(
               hasModel
                   ? t.media_env_ready
@@ -251,6 +253,33 @@ class _ErrorBanner extends StatelessWidget {
         '$message${detail == null ? '' : '\n$detail'}',
         style: const TextStyle(fontSize: 12, color: Colors.red),
       ),
+    );
+  }
+}
+
+class _DownloadProgressText extends StatelessWidget {
+  final DownloadStatus status;
+
+  const _DownloadProgressText({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Translations.of(context);
+    final pct = (status.progress * 100).toStringAsFixed(0);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(value: status.progress),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '$pct% · ${formatBytesRate(status.speedBps)} · '
+          '${t.media_dl_eta(time: formatEtaClock(status.etaSeconds))}',
+          style: const TextStyle(fontSize: 11),
+        ),
+      ],
     );
   }
 }
