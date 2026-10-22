@@ -20,22 +20,6 @@ void main() {
     });
   });
 
-  group('whisperAssetCandidates', () {
-    test('Windows x64 命中 zip，排除 cublas/vulkan', () {
-      final assets = MediaToolService.whisperAssetCandidates(
-          isWindows: true, isMac: false, isArm: false);
-      expect(assets.contains('whisper-bin-x64.zip'), isTrue);
-      expect(assets.any((a) => a.contains('cublas')), isFalse);
-    });
-    test('macOS arm64 命中 arm64 包', () {
-      final assets = MediaToolService.whisperAssetCandidates(
-          isWindows: false, isMac: true, isArm: true);
-      expect(assets.where((a) => a.contains('arm64')), isNotEmpty);
-      expect(assets.any((a) => a.contains('x64') && !a.contains('arm64')),
-          isFalse);
-    });
-  });
-
   group('check（注入假命令执行）', () {
     late Directory tmp;
     setUp(() => tmp = Directory.systemTemp.createTempSync('vtn_tools'));

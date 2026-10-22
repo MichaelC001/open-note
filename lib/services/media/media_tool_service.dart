@@ -130,34 +130,6 @@ class MediaToolService {
     return RegExp(r'^\d{4}\.\d{2}\.\d{2}').hasMatch(t) ? t : null;
   }
 
-  /// whisper.cpp Release 资产候选名（按平台），排除 CUDA/Vulkan 等重型构建。
-  static List<String> whisperAssetCandidates(
-      {required bool isWindows, required bool isMac, required bool isArm}) {
-    final bad = RegExp(r'cublas|vulkan|clblast|opencl|wasm|addon');
-    final all = [
-      'whisper-bin-x64.zip',
-      'whisper-bin-arm64.zip',
-      'whisper-macos-arm64.zip',
-      'whisper-macos-x64.zip',
-      'whisper-arm64-macos.zip',
-      'whisper-x64-macos.zip',
-      'whisper-macos-arm64.tar.gz',
-      'whisper-macos-x64.tar.gz',
-      'whisper-linux-x64.tar.gz',
-      'whisper-bin-linux-x64.tar.gz',
-    ].where((n) => !bad.hasMatch(n)).toList();
-    return all.where((n) {
-      if (isWindows) return n.contains('x64') && n.endsWith('.zip');
-      if (isMac) {
-        if (!(n.contains('macos') || n.contains('darwin'))) return false;
-        return isArm
-            ? n.contains('arm64')
-            : n.contains('x64') && !n.contains('arm64');
-      }
-      return n.contains('linux') && n.endsWith('.tar.gz');
-    }).toList();
-  }
-
   /// 从解压目录递归查找工具二进制，移动到统一 toolDir 并赋执行权限；找不到返回 null。
   Future<String?> installExtractedBinary(
       String extractedDir, MediaToolKind kind) async {

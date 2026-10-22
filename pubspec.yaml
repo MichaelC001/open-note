@@ -67,6 +67,7 @@ dependencies:
   flutter_quill: ^11.5.0
   markdown_quill: ^4.3.0
   desktop_drop: ^0.5.0
+  archive: ^3.6.1
   crypto: ^3.0.0
   package_info_plus: ^8.0.0
   pub_semver: ^2.1.4
