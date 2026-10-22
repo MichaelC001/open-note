@@ -1,5 +1,6 @@
 // lib/widgets/settings/video_note_tab.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../l10n/strings.g.dart';
@@ -13,7 +14,10 @@ import '../media_import/model_list.dart';
 import '../media_import/tool_status_row.dart';
 
 class VideoNoteTab extends StatefulWidget {
-  const VideoNoteTab({super.key});
+  final WhisperModelService modelService;
+
+  VideoNoteTab({super.key, WhisperModelService? modelService})
+      : modelService = modelService ?? WhisperModelService();
 
   @override
   State<VideoNoteTab> createState() => _VideoNoteTabState();
@@ -99,6 +103,35 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
               ),
             const Divider(height: 24),
             const ModelList(),
+            const SizedBox(height: 8),
+            FutureBuilder<String>(
+              future: widget.modelService.modelsDir(),
+              builder: (context, snap) {
+                final dir = snap.data ?? '';
+                return Row(children: [
+                  const Icon(Icons.folder_open,
+                      size: 16, color: DesignTokens.gray500),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(dir,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 11, color: DesignTokens.gray500)),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.copy, size: 16),
+                    tooltip: t.media_settings_copyPath,
+                    onPressed: dir.isEmpty
+                        ? null
+                        : () {
+                            Clipboard.setData(ClipboardData(text: dir));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(t.media_env_copied)));
+                          },
+                  ),
+                ]);
+              },
+            ),
           ]),
           const SizedBox(height: 16),
           _card(isDark, [

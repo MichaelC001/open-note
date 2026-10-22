@@ -2,6 +2,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_note/l10n/strings.g.dart';
 import 'package:open_note/providers/language_provider.dart';
@@ -41,8 +42,9 @@ class _CountingToolService extends MediaToolService {
 }
 
 class _FastModelService extends WhisperModelService {
-  _FastModelService(Directory dir)
-      : super(resolveBaseDir: () async => dir.path);
+  final Directory dir;
+
+  _FastModelService(this.dir) : super(resolveBaseDir: () async => dir.path);
 
   @override
   Future<WhisperModelTier> recommendTierForDevice() async =>
@@ -50,6 +52,10 @@ class _FastModelService extends WhisperModelService {
 
   @override
   Future<File?> localModelFile(WhisperModelTier tier) async => null;
+
+  // 基类实现含真实文件 IO（exists/create），FakeAsync 下无法完成，改纯计算
+  @override
+  Future<String> modelsDir() async => '${dir.path}/whisper_models';
 }
 
 class _AllDownloadedFastService extends _FastModelService {
@@ -63,6 +69,7 @@ void main() {
   late Directory tmpTools;
   late Directory tmpModels;
   late _CountingToolService toolsFake;
+  late _FastModelService modelsFake;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
@@ -79,10 +86,10 @@ void main() {
 
   MediaImportProvider makeProvider({bool toolsReady = false}) {
     toolsFake = _CountingToolService(tmpTools, allReady: toolsReady);
-    final models = toolsReady
+    modelsFake = toolsReady
         ? _AllDownloadedFastService(tmpModels)
         : _FastModelService(tmpModels);
-    return MediaImportProvider(toolService: toolsFake, modelService: models);
+    return MediaImportProvider(toolService: toolsFake, modelService: modelsFake);
   }
 
   Future<void> pumpTab(WidgetTester tester, MediaImportProvider provider) async {
@@ -90,7 +97,7 @@ void main() {
       TranslationProvider(
         child: ChangeNotifierProvider<MediaImportProvider>.value(
           value: provider,
-          child: const MaterialApp(home: Scaffold(body: VideoNoteTab())),
+          child: MaterialApp(home: Scaffold(body: VideoNoteTab(modelService: modelsFake))),
         ),
       ),
     );
@@ -157,6 +164,23 @@ void main() {
     expect(find.text('base'), findsOneWidget);
     expect(find.text('large-v3-turbo'), findsOneWidget);
     expect(find.textContaining('v1'), findsWidgets); // 就绪版本号
+  });
+
+  testWidgets('显示模型下载目录并可复制', (tester) async {
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform, (call) async => null);
+    final provider = makeProvider(toolsReady: true);
+    await pumpTab(tester, provider);
+    await provider.checkEnvironment();
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.folder_open), findsOneWidget);
+    expect(find.textContaining('whisper_models'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.copy));
+    await tester.pump();
+    expect(find.byType(SnackBar), findsOneWidget);
+    // 冲洗 SnackBar 自动消失 Timer（4s）及其退场动画，避免 pending timer
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('点击重新检测触发 checkEnvironment', (tester) async {

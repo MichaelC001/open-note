@@ -2350,6 +2350,7 @@
   "media_dl_eta": "осталось {time}",
   "@media_dl_eta": { "parameters": { "time": "String" } },
   "media_env_autoInstall": "Автоустановка",
+  "media_settings_copyPath": "Копировать путь",
   "media_env_background": "Загрузка продолжается в фоне: Настройки → Видео в заметку.",
   "media_env_uninstall": "Удалить",
   "media_env_finishing": "Скачано · Установка…",

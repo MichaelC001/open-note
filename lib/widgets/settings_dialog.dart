@@ -403,7 +403,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
       case 3:
         return const KnowledgeBaseTab();
       case 4:
-        return const VideoNoteTab();
+        return VideoNoteTab();
       case 5:
         return const AssistantSettingsTab();
       case 6:

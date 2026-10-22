@@ -2358,6 +2358,7 @@
   "media_dl_eta": "{time} left",
   "@media_dl_eta": { "parameters": { "time": "String" } },
   "media_env_autoInstall": "Auto-install",
+  "media_settings_copyPath": "Copy path",
   "media_env_background":
       "Download continues in the background. Check Settings → Video to Note for progress.",
   "media_env_uninstall": "Uninstall",

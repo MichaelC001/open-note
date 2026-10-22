@@ -2350,6 +2350,7 @@
   "media_dl_eta": "剩餘 {time}",
   "@media_dl_eta": { "parameters": { "time": "String" } },
   "media_env_autoInstall": "一鍵安裝",
+  "media_settings_copyPath": "複製路徑",
   "media_env_background": "下載已在背景進行，可在 設定→視訊轉筆記 查看進度",
   "media_env_uninstall": "解除安裝",
   "media_env_finishing": "下載完成 · 安裝中…",

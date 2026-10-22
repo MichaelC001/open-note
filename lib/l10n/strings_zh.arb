@@ -2358,6 +2358,7 @@
   "media_dl_eta": "剩余 {time}",
   "@media_dl_eta": { "parameters": { "time": "String" } },
   "media_env_autoInstall": "一键安装",
+  "media_settings_copyPath": "复制路径",
   "media_env_background": "下载已在后台进行，可在 设置→视频转笔记 查看进度",
   "media_env_uninstall": "卸载",
   "media_env_finishing": "下载完成 · 安装中…",
