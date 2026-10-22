@@ -1793,6 +1793,8 @@ class TranslationsZhTw extends Translations with BaseTranslations<AppLocale, Tra
 	@override String get media_settings_defaultModelAuto => '自動推薦';
 	@override String media_dl_eta({required Object time}) => '剩餘 ${time}';
 	@override String get media_env_autoInstall => '一鍵安裝';
+	@override String get media_env_finishing => '下載完成 · 安裝中…';
+	@override String get media_env_recommended => '推薦';
 	@override String get media_env_installing => '安裝中…';
 	@override String get media_env_recheck => '重新偵測';
 	@override String get media_settings_deleteSource => '完成後刪除下載的原始媒體';

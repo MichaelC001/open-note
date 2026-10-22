@@ -24,6 +24,13 @@ class _CountingToolService extends MediaToolService {
   }
 }
 
+class _AllDownloadedFastService extends _FastModelService {
+  _AllDownloadedFastService(super.dir);
+
+  @override
+  Future<File?> localModelFile(WhisperModelTier tier) async => File('m.bin');
+}
+
 class _FastModelService extends WhisperModelService {
   _FastModelService(Directory dir)
       : super(resolveBaseDir: () async => dir.path);
@@ -158,6 +165,46 @@ void main() {
       await tester.pumpAndSettle();
       // 测试默认 TargetPlatform 为 macOS
       expect(find.text('一键安装'), findsOneWidget);
+    });
+
+    testWidgets('识别模型列表展示全部三档，默认选中硬件推荐档', (tester) async {
+      final provider = MediaImportProvider(
+        toolService: tools,
+        modelService: _AllDownloadedFastService(tmpModels),
+      );
+      await pumpDialogWith(tester, provider);
+      await provider.startForFile(File('/tmp/demo.mp4'));
+      await tester.pumpAndSettle();
+
+      // 三档全部可见（_AllModelsService 推荐档为 large-v3-turbo）
+      expect(find.text('base'), findsOneWidget);
+      expect(find.text('medium'), findsOneWidget);
+      expect(find.text('large-v3-turbo'), findsOneWidget);
+      expect(find.text('推荐'), findsOneWidget);
+      // 全部已下载 -> 每档显示已就绪，无下载按钮
+      expect(find.text('已就绪'), findsNWidgets(3));
+      expect(find.text('下载模型'), findsNothing);
+      expect(provider.selectedTier, WhisperModelTier.base);
+    });
+
+    testWidgets('未下载档位显示下载按钮，选中可切换', (tester) async {
+      final provider = makeProvider();
+      await pumpDialogWith(tester, provider);
+      await provider.startForFile(File('/tmp/demo.mp4'));
+      await tester.pumpAndSettle();
+      // 仅 large-v3-turbo 已就绪（场景：其余两档未下载）
+      provider.downloadedTiers
+        ..clear()
+        ..add(WhisperModelTier.largeV3Turbo);
+      provider.notifyListeners();
+      await tester.pumpAndSettle();
+
+      expect(find.text('下载模型'), findsNWidgets(2));
+      // 切换到未下载的 base 档
+      await tester.tap(find.text('base'));
+      await tester.pumpAndSettle();
+      expect(provider.selectedTier, WhisperModelTier.base);
+      expect(provider.environmentReady, isFalse);
     });
 
     testWidgets('关闭向导后状态重置回 source 步，可重新填写', (tester) async {

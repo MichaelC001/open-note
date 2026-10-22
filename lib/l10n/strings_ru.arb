@@ -2350,6 +2350,8 @@
   "media_dl_eta": "осталось {time}",
   "@media_dl_eta": { "parameters": { "time": "String" } },
   "media_env_autoInstall": "Автоустановка",
+  "media_env_finishing": "Скачано · Установка…",
+  "media_env_recommended": "Рекомендуется",
   "media_env_installing": "Установка…",
   "media_env_recheck": "Проверить снова",
   "media_settings_deleteSource": "Удалять скачанное медиа после завершения"

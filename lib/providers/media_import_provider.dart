@@ -49,6 +49,7 @@ class MediaImportProvider extends ChangeNotifier {
 
   final Map<MediaToolKind, MediaToolStatus> toolStatuses = {};
   final Map<MediaToolKind, bool> toolDownloading = {};
+  final Map<MediaToolKind, bool> toolFinishing = {};
   final Map<MediaToolKind, bool> toolInstalling = {};
   final Map<MediaToolKind, DownloadStatus> toolDownloadStatus = {};
   final Map<String, DownloadSpeedTracker> _downloadTrackers = {};
@@ -135,6 +136,12 @@ class MediaImportProvider extends ChangeNotifier {
     }
   }
 
+  void _markFinishing(MediaToolKind kind) {
+    toolDownloading[kind] = false;
+    toolFinishing[kind] = true;
+    _notify();
+  }
+
   Future<void> downloadTool(MediaToolKind kind) async {
     toolDownloading[kind] = true;
     toolDownloadStatus[kind] = const DownloadStatus();
@@ -173,6 +180,7 @@ class MediaImportProvider extends ChangeNotifier {
             }
           },
         );
+        _markFinishing(kind);
         if (!Platform.isWindows) {
           await Process.run('chmod', ['+x', dest.path]);
         }
@@ -197,6 +205,7 @@ class MediaImportProvider extends ChangeNotifier {
             }
           },
         );
+        _markFinishing(kind);
         final extractDir =
             '$dir/_extract_${DateTime.now().millisecondsSinceEpoch}';
         await downloader.extract(archive, extractDir);
@@ -224,6 +233,7 @@ class MediaImportProvider extends ChangeNotifier {
       errorDetail = e.toString();
     } finally {
       toolDownloading[kind] = false;
+      toolFinishing[kind] = false;
       _downloadCancel = null;
       _downloadTrackers.remove('tool:${kind.name}');
       _notify();

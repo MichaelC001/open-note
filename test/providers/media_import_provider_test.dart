@@ -27,6 +27,17 @@ class _ReadyToolService extends MediaToolService {
   }
 }
 
+class _GatedCheckToolService extends _ReadyToolService {
+  Completer<void>? checkGate;
+  _GatedCheckToolService(super.base);
+
+  @override
+  Future<MediaToolStatus> check(MediaToolKind kind) async {
+    if (checkGate != null) await checkGate!.future;
+    return super.check(kind);
+  }
+}
+
 class _AllModelsService extends WhisperModelService {
   _AllModelsService(Future<String> Function() base)
     : super(resolveBaseDir: base);
@@ -218,6 +229,32 @@ void main() {
 
       fake.release.complete();
       await run;
+    });
+
+    test('工具下载完成后进入 安装中 状态，检测完成后退出', () async {
+      final tools = _GatedCheckToolService(() async => tmp.path);
+      final fake = _HangingDownloader();
+      final p = MediaImportProvider(
+        toolService: tools,
+        modelService: _AllModelsService(() async => tmp.path),
+        downloader: fake,
+      );
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+      tools.checkGate = Completer<void>();
+
+      final run = p.downloadTool(MediaToolKind.ytDlp);
+      await fake.started.future;
+      expect(p.toolFinishing[MediaToolKind.ytDlp] ?? false, isFalse);
+
+      fake.release.complete();
+      await Future.delayed(const Duration(milliseconds: 20));
+      expect(p.toolDownloading[MediaToolKind.ytDlp] ?? false, isFalse);
+      expect(p.toolFinishing[MediaToolKind.ytDlp] ?? false, isTrue);
+
+      tools.checkGate!.complete();
+      await run;
+      expect(p.toolFinishing[MediaToolKind.ytDlp] ?? false, isFalse);
+      expect(p.toolStatuses[MediaToolKind.ytDlp]!.ready, isTrue);
     });
   });
 }

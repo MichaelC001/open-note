@@ -8,6 +8,7 @@ import '../../providers/media_import_provider.dart';
 import '../../services/media/download_stats.dart';
 import '../../services/media/media_tool_service.dart';
 import '../../services/media/whisper_model_service.dart';
+import '../../theme/design_tokens.dart';
 
 class EnvCheckStep extends StatelessWidget {
   const EnvCheckStep({super.key});
@@ -71,6 +72,7 @@ class EnvCheckStep extends StatelessWidget {
               kind: kind,
               status: p.toolStatuses[kind],
               downloading: p.toolDownloading[kind] ?? false,
+              finishing: p.toolFinishing[kind] ?? false,
               downloadStatus: p.toolDownloadStatus[kind],
               autoInstalling: p.toolInstalling[kind] ?? false,
               guide: _installGuides[kind]![platformKey]!,
@@ -101,6 +103,7 @@ class _ToolTile extends StatelessWidget {
   final MediaToolKind kind;
   final MediaToolStatus? status;
   final bool downloading;
+  final bool finishing;
   final DownloadStatus? downloadStatus;
   final bool autoInstalling;
   final String guide;
@@ -110,6 +113,7 @@ class _ToolTile extends StatelessWidget {
     required this.kind,
     required this.status,
     required this.downloading,
+    required this.finishing,
     this.downloadStatus,
     required this.autoInstalling,
     required this.guide,
@@ -139,7 +143,20 @@ class _ToolTile extends StatelessWidget {
         MediaToolKind.ytDlp => 'yt-dlp',
         MediaToolKind.whisperCli => 'whisper.cpp',
       }),
-      subtitle: downloading
+      subtitle: finishing
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: 8),
+                Text(t.media_env_finishing),
+              ],
+            )
+          : downloading
           ? _DownloadProgressText(
               status: downloadStatus ?? const DownloadStatus(),
             )
@@ -206,30 +223,142 @@ class _ModelSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Translations.of(context);
     final p = context.watch<MediaImportProvider>();
-    final hasModel = p.downloadedTiers.contains(p.selectedTier);
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(
-        hasModel ? Icons.check_circle : Icons.download_outlined,
-        color: hasModel ? Colors.green : Colors.orange,
-      ),
-      title: Text(
-        '${t.media_env_model} · ${WhisperModelService.infoFor(p.selectedTier).displayLabel}',
-      ),
-      subtitle: p.modelDownloading
-          ? _DownloadProgressText(status: p.modelDownloadStatus)
-          : Text(
-              hasModel
-                  ? t.media_env_ready
-                  : '~${(WhisperModelService.infoFor(p.selectedTier).downloadSizeBytes / 1024 / 1024).round()} MB',
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          t.media_env_model,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 4),
+        for (final tier in WhisperModelTier.values)
+          _ModelTile(
+            tier: tier,
+            selected: p.selectedTier == tier,
+            recommended: p.recommendedTier == tier,
+            downloaded: p.downloadedTiers.contains(tier),
+            downloadingThis: p.modelDownloading && p.selectedTier == tier,
+            downloadStatus: p.modelDownloadStatus,
+            enabled: !p.modelDownloading,
+            onSelect: () => p.selectTier(tier),
+            onDownload: () {
+              p.selectTier(tier);
+              p.downloadSelectedModel();
+            },
+          ),
+      ],
+    );
+  }
+}
+
+class _ModelTile extends StatelessWidget {
+  final WhisperModelTier tier;
+  final bool selected;
+  final bool recommended;
+  final bool downloaded;
+  final bool downloadingThis;
+  final DownloadStatus downloadStatus;
+  final bool enabled;
+  final VoidCallback onSelect;
+  final VoidCallback onDownload;
+
+  const _ModelTile({
+    required this.tier,
+    required this.selected,
+    required this.recommended,
+    required this.downloaded,
+    required this.downloadingThis,
+    required this.downloadStatus,
+    required this.enabled,
+    required this.onSelect,
+    required this.onDownload,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Translations.of(context);
+    final label = WhisperModelService.infoFor(tier).displayLabel;
+    return InkWell(
+      onTap: enabled ? onSelect : null,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            Icon(
+              selected ? Icons.radio_button_checked : Icons.radio_button_off,
+              size: 20,
+              color: selected
+                  ? DesignTokens.primary500
+                  : DesignTokens.gray400,
             ),
-      trailing: hasModel || p.modelDownloading
-          ? null
-          : TextButton(
-              onPressed: () =>
-                  context.read<MediaImportProvider>().downloadSelectedModel(),
-              child: Text(t.media_env_downloadModel),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        label,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      if (recommended) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: DesignTokens.primary500.withValues(
+                              alpha: 0.1,
+                            ),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            t.media_env_recommended,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: DesignTokens.primary500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  if (downloadingThis)
+                    _DownloadProgressText(status: downloadStatus)
+                  else
+                    Text(
+                      downloaded
+                          ? t.media_env_ready
+                          : '~${(WhisperModelService.infoFor(tier).downloadSizeBytes / 1024 / 1024).round()} MB',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: DesignTokens.gray500,
+                      ),
+                    ),
+                ],
+              ),
             ),
+            const SizedBox(width: 8),
+            if (!downloaded && !downloadingThis)
+              TextButton(
+                onPressed: enabled ? onDownload : null,
+                child: Text(t.media_env_downloadModel),
+              )
+            else if (downloaded)
+              const Icon(
+                Icons.check_circle,
+                size: 18,
+                color: Colors.green,
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

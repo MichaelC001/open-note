@@ -1793,6 +1793,8 @@ class TranslationsRu extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get media_settings_defaultModelAuto => 'Автоподбор';
 	@override String media_dl_eta({required Object time}) => 'осталось ${time}';
 	@override String get media_env_autoInstall => 'Автоустановка';
+	@override String get media_env_finishing => 'Скачано · Установка…';
+	@override String get media_env_recommended => 'Рекомендуется';
 	@override String get media_env_installing => 'Установка…';
 	@override String get media_env_recheck => 'Проверить снова';
 	@override String get media_settings_deleteSource => 'Удалять скачанное медиа после завершения';
