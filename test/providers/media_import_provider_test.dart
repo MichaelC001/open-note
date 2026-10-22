@@ -276,6 +276,38 @@ void main() {
     });
   });
 
+  group('operationInProgress 统一判定', () {
+    test('覆盖 _busy/finishing 窗口，空闲时为 false', () async {
+      final tools = _GatedCheckToolService(() async => tmp.path);
+      final fake = _HangingDownloader();
+      final p = MediaImportProvider(
+        toolService: tools,
+        modelService: _AllModelsService(() async => tmp.path),
+        downloader: fake,
+      );
+      // _busy 窗口：挂起 checkEnvironment 期间判定为进行中
+      tools.checkGate = Completer<void>();
+      final start = p.startForFile(File('${tmp.path}/a.mp4'));
+      await Future.delayed(const Duration(milliseconds: 20));
+      expect(p.operationInProgress, isTrue); // checkEnvironment 进行中(_busy)
+      tools.checkGate!.complete();
+      await start;
+      expect(p.operationInProgress, isFalse);
+
+      // finishing 窗口：下载收尾（gated check 挂起）判定为进行中
+      tools.checkGate = Completer<void>();
+      final run = p.downloadTool(MediaToolKind.ytDlp);
+      await fake.started.future;
+      fake.release.complete();
+      await Future.delayed(const Duration(milliseconds: 20));
+      expect(p.toolFinishing[MediaToolKind.ytDlp] ?? false, isTrue);
+      expect(p.operationInProgress, isTrue); // finishing 窗口
+      tools.checkGate!.complete();
+      await run;
+      expect(p.operationInProgress, isFalse);
+    });
+  });
+
   group('uninstallPlan 纯函数', () {
     test('mac 有 brew：三种工具都有 brew uninstall 计划', () {
       final ffmpegPlan = MediaImportProvider.uninstallPlan(MediaToolKind.ffmpeg,

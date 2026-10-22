@@ -29,6 +29,8 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
   WhisperModelTier? _tier;
   bool _deleteSource = true;
   bool _loaded = false;
+  late final Future<String> _modelsDirFuture =
+      widget.modelService.modelsDir();
 
   @override
   void initState() {
@@ -37,9 +39,7 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final p = context.read<MediaImportProvider>();
-      final busyNow = p.busy ||
-          p.toolDownloading.values.any((v) => v) ||
-          p.modelDownloading;
+      final busyNow = p.operationInProgress;
       if (!busyNow) p.checkEnvironment();
     });
   }
@@ -72,7 +72,7 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 IconButton(
-                  icon: p.busy
+                  icon: p.operationInProgress
                       ? const SizedBox(
                           width: 16,
                           height: 16,
@@ -80,8 +80,9 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
                         )
                       : const Icon(Icons.refresh),
                   tooltip: t.media_env_recheck,
-                  onPressed:
-                      p.busy ? null : () => p.checkEnvironment(),
+                  onPressed: p.operationInProgress
+                      ? null
+                      : () => p.checkEnvironment(),
                 ),
               ],
             ),
@@ -93,7 +94,7 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
             ModelList(onDelete: (tier) => _confirmDeleteModel(context, p, tier)),
             const SizedBox(height: 8),
             FutureBuilder<String>(
-              future: widget.modelService.modelsDir(),
+              future: _modelsDirFuture,
               builder: (context, snap) {
                 final dir = snap.data ?? '';
                 return Row(children: [

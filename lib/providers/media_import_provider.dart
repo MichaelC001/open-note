@@ -79,6 +79,14 @@ class MediaImportProvider extends ChangeNotifier {
 
   bool get busy => _busy;
 
+  bool get operationInProgress =>
+      _busy ||
+      toolDownloading.values.any((v) => v) ||
+      toolInstalling.values.any((v) => v) ||
+      toolFinishing.values.any((v) => v) ||
+      modelDownloading ||
+      modelDeleting;
+
   bool get transcriptionActive => _activeService != null;
 
   String pendingLanguage = 'auto';

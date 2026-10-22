@@ -1799,7 +1799,7 @@ class TranslationsZhTw extends Translations with BaseTranslations<AppLocale, Tra
 	@override String media_env_modelDeleteConfirmTitle({required Object name}) => '確定刪除模型 ${name}？';
 	@override String get media_env_modelDeleteConfirmBody => '將刪除已下載的模型檔案，需要時可重新下載。';
 	@override String get media_env_useManager => '透過系統套件管理器安裝，請在終端機用對應命令解除安裝';
-	@override String get media_env_background => '下載已在背景進行，可在 設定→視訊轉筆記 查看進度';
+	@override String get media_env_background => '下載已在背景進行，可在 設定→影片轉筆記 查看進度';
 	@override String get media_env_uninstall => '解除安裝';
 	@override String get media_env_finishing => '下載完成 · 安裝中…';
 	@override String get media_env_recommended => '推薦';

@@ -47,7 +47,7 @@ class _MediaImportDialogState extends State<MediaImportDialog> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final p = context.read<MediaImportProvider>();
-      if (p.step == MediaImportStep.envCheck) {
+      if (p.step == MediaImportStep.envCheck && !p.operationInProgress) {
         p.checkEnvironment();
       }
     });
@@ -60,10 +60,7 @@ class _MediaImportDialogState extends State<MediaImportDialog> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) return;
         final p = context.read<MediaImportProvider>();
-        final background = p.toolDownloading.values.any((v) => v) ||
-            p.toolInstalling.values.any((v) => v) ||
-            p.modelDownloading;
-        if (background) {
+        if (p.operationInProgress) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(t.media_env_background)),
           );

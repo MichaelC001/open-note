@@ -217,12 +217,6 @@ class ToolStatusRow extends StatelessWidget {
                     );
                   },
                 ),
-                if (onUninstall != null)
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    tooltip: t.media_env_uninstall,
-                    onPressed: onUninstall,
-                  ),
               ],
             ),
     );
