@@ -3,7 +3,7 @@
 
 import 'dart:convert';
 
-enum NoteSourceType { manual, paste, url, file }
+enum NoteSourceType { manual, paste, url, file, video }
 
 enum NoteFormat { markdown, plainText, richText, code }
 
