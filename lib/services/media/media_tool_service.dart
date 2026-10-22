@@ -131,6 +131,8 @@ class MediaToolService {
   }
 
   /// 从解压目录递归查找工具二进制，移动到统一 toolDir 并赋执行权限；找不到返回 null。
+  /// whisperCli 额外把二进制所在目录内的 *.dll/*.so*/*.dylib 平铺复制到 toolDir
+  /// （Windows 包与 ubuntu 包的动态库均与 whisper-cli 同目录，缺库则无法启动）。
   Future<String?> installExtractedBinary(
       String extractedDir, MediaToolKind kind) async {
     final candidates = switch (kind) {
@@ -149,7 +151,26 @@ class MediaToolService {
       }
     }
     if (found == null) return null;
-    final dest = File('${await toolDir(kind)}/${binaryName(kind)}');
+    final dirPath = await toolDir(kind);
+    if (kind == MediaToolKind.whisperCli) {
+      await for (final e in found.parent.list(followLinks: false)) {
+        if (e is! File) continue;
+        final name = e.uri.pathSegments.last;
+        final lower = name.toLowerCase();
+        final isLib = lower.endsWith('.dll') ||
+            lower.endsWith('.dylib') ||
+            lower.contains('.so');
+        if (!isLib) continue;
+        final libDest = File('$dirPath/$name');
+        if (await libDest.exists()) await libDest.delete();
+        try {
+          await e.rename(libDest.path);
+        } catch (_) {
+          await e.copy(libDest.path);
+        }
+      }
+    }
+    final dest = File('$dirPath/${binaryName(kind)}');
     if (await dest.exists()) await dest.delete();
     try {
       await found.rename(dest.path);

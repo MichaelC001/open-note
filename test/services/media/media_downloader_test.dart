@@ -58,12 +58,37 @@ void main() {
             throwsUnsupportedError);
       }
     });
-    test('pickWhisperAsset 命中与排除', () {
+    test('pickWhisperAsset 用 b5454 真实资产列表命中与排除', () {
+      const b5454Assets = [
+        'whisper-b5454-xcframework.zip',
+        'whisper-bin-ubuntu-arm64.tar.gz',
+        'whisper-bin-ubuntu-x64.tar.gz',
+        'whisper-bin-win-cpu-arm64.zip',
+        'whisper-bin-win-cuda-11.8.0-x64.zip',
+        'whisper-bin-win-cuda-12.4.0-x64.zip',
+        'whisper-bin-win-cuda-13.4-arm64.zip',
+        'whisper-bin-win-opencl-adreno-arm64.zip',
+        'whisper-bin-Win32.zip',
+        'whisper-bin-x64.zip',
+        'whisper-blas-bin-Win32.zip',
+        'whisper-blas-bin-x64.zip',
+      ];
       expect(
-          MediaDownloader.pickWhisperAsset(
-              ['whisper-bin-x64.zip', 'whisper-bin-x64-cublas.zip'],
+          MediaDownloader.pickWhisperAsset(b5454Assets,
               isWindows: true, isMac: false, isArm: false),
           'whisper-bin-x64.zip');
+      expect(
+          MediaDownloader.pickWhisperAsset(b5454Assets,
+              isWindows: false, isMac: false, isArm: false),
+          'whisper-bin-ubuntu-x64.tar.gz');
+      expect(
+          MediaDownloader.pickWhisperAsset(b5454Assets,
+              isWindows: false, isMac: false, isArm: true),
+          'whisper-bin-ubuntu-arm64.tar.gz');
+      expect(
+          MediaDownloader.pickWhisperAsset(b5454Assets,
+              isWindows: false, isMac: true, isArm: true),
+          isNull);
       expect(
           MediaDownloader.pickWhisperAsset(['unrelated.zip'],
               isWindows: true, isMac: false, isArm: false),

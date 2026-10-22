@@ -101,5 +101,29 @@ void main() {
               '${tmp.path}/extract', MediaToolKind.whisperCli),
           isNull);
     });
+
+    test('whisper 安装时把同目录动态库一并平铺搬到 toolDir', () async {
+      final binDir = Directory('${tmp.path}/extract/build/bin');
+      binDir.createSync(recursive: true);
+      final exe = Platform.isWindows ? '.exe' : '';
+      File('${binDir.path}/whisper-cli$exe').writeAsStringSync('#!/bin/sh\n');
+      final lib = Platform.isWindows
+          ? File('${binDir.path}/whisper.dll')
+          : File('${binDir.path}/libwhisper.so');
+      lib.writeAsStringSync('libbytes');
+      // 干扰项：非库文件不应被搬动
+      File('${binDir.path}/readme.txt').writeAsStringSync('doc');
+
+      final svc = MediaToolService(resolveBaseDir: () async => tmp.path);
+      final installed = await svc.installExtractedBinary(
+          '${tmp.path}/extract', MediaToolKind.whisperCli);
+      expect(installed, isNotNull);
+      final toolDirPath = await svc.toolDir(MediaToolKind.whisperCli);
+      expect(
+          File('$toolDirPath/whisper-cli$exe').existsSync(), isTrue);
+      final libName = lib.uri.pathSegments.last;
+      expect(File('$toolDirPath/$libName').existsSync(), isTrue);
+      expect(File('$toolDirPath/readme.txt').existsSync(), isFalse);
+    });
   });
 }

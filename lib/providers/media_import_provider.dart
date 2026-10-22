@@ -192,6 +192,10 @@ class MediaImportProvider extends ChangeNotifier {
         }
       }
       toolStatuses[kind] = await toolService.check(kind);
+      if (!(toolStatuses[kind]?.ready ?? false)) {
+        errorMessage = '工具安装后校验未通过';
+        errorDetail = null;
+      }
     } catch (e) {
       errorMessage = '工具下载/安装失败';
       errorDetail = e.toString();
@@ -246,23 +250,27 @@ class MediaImportProvider extends ChangeNotifier {
   Future<String> _resolveWhisperAssetUrl() async {
     final dio = Dio();
     final resp = await dio.get<dynamic>(
-      MediaDownloader.whisperLatestReleaseApiUrl(),
+      MediaDownloader.whisperReleasesApiUrl(),
       options: Options(headers: {'Accept': 'application/vnd.github+json'}),
     );
-    final assets = (resp.data['assets'] as List)
-        .map((a) => (a as Map)['name'].toString())
-        .toList();
-    final asset = MediaDownloader.pickWhisperAsset(
-      assets,
-      isWindows: Platform.isWindows,
-      isMac: Platform.isMacOS,
-      isArm: _isArmHost,
-    );
-    if (asset == null) {
-      throw Exception('当前平台暂无 whisper.cpp 预编译包，请查看安装指引手动安装');
+    final releases = (resp.data as List?) ?? const [];
+    for (final release in releases) {
+      final map = release as Map;
+      final assets = ((map['assets'] as List?) ?? const [])
+          .map((a) => (a as Map)['name'].toString())
+          .toList();
+      final asset = MediaDownloader.pickWhisperAsset(
+        assets,
+        isWindows: Platform.isWindows,
+        isMac: Platform.isMacOS,
+        isArm: _isArmHost,
+      );
+      if (asset != null) {
+        return 'https://github.com/ggml-org/whisper.cpp/releases/download/'
+            '${map['tag_name']}/$asset';
+      }
     }
-    return 'https://github.com/ggml-org/whisper.cpp/releases/download/'
-        '${resp.data['tag_name']}/$asset';
+    throw Exception('当前平台暂无 whisper.cpp 预编译包，请查看安装指引手动安装');
   }
 
   /// Dart 进程真实架构（Rosetta 下 x64 进程选 x64 包恰好正确）。

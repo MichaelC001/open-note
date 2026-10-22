@@ -66,8 +66,8 @@ class MediaDownloader {
     throw UnsupportedError('Linux 不提供 ffmpeg 便携版，请使用系统包管理器安装');
   }
 
-  static String whisperLatestReleaseApiUrl() =>
-      'https://api.github.com/repos/ggml-org/whisper.cpp/releases/latest';
+  static String whisperReleasesApiUrl() =>
+      'https://api.github.com/repos/ggml-org/whisper.cpp/releases?per_page=30';
 
   static String? pickWhisperAsset(List<String> names,
       {required bool isWindows, required bool isMac, required bool isArm}) {
@@ -187,7 +187,8 @@ class _DigestConsumer implements Sink<crypto.Digest> {
 class MediaToolCandidates {
   static List<String> whisper(List<String> names,
       {required bool isWindows, required bool isMac, required bool isArm}) {
-    final bad = RegExp(r'cublas|vulkan|clblast|opencl|wasm|addon');
+    final bad =
+        RegExp(r'cuda|blas|win32|xcframework|adreno|cublas|vulkan|clblast|opencl|wasm|addon');
     return names.where((n) {
       if (bad.hasMatch(n)) return false;
       if (isWindows) return n.contains('x64') && n.endsWith('.zip');
@@ -197,8 +198,11 @@ class MediaToolCandidates {
             ? n.contains('arm64')
             : n.contains('x64') && !n.contains('arm64');
       }
-      return n.contains('linux') &&
-          (n.endsWith('.tar.gz') || n.endsWith('.tgz'));
+      if (!(n.contains('linux') || n.contains('ubuntu'))) return false;
+      if (!n.endsWith('.tar.gz') && !n.endsWith('.tgz')) return false;
+      return isArm
+          ? n.contains('arm64')
+          : n.contains('x64') && !n.contains('arm64');
     }).toList();
   }
 }

@@ -88,6 +88,9 @@ class _ToolTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Translations.of(context);
     final ready = status?.ready ?? false;
+    // whisper.cpp 官方 Release 无 macOS CLI 资产，隐藏应用内下载，仅保留指引
+    final hideDownload = kind == MediaToolKind.whisperCli &&
+        Theme.of(context).platform == TargetPlatform.macOS;
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: Icon(ready ? Icons.check_circle : Icons.error_outline,
@@ -108,12 +111,13 @@ class _ToolTile extends StatelessWidget {
                   child: LinearProgressIndicator(value: progress),
                 )
               : Row(mainAxisSize: MainAxisSize.min, children: [
-                  TextButton(
-                    onPressed: () => context
-                        .read<MediaImportProvider>()
-                        .downloadTool(kind),
-                    child: Text(t.media_env_download),
-                  ),
+                  if (!hideDownload)
+                    TextButton(
+                      onPressed: () => context
+                          .read<MediaImportProvider>()
+                          .downloadTool(kind),
+                      child: Text(t.media_env_download),
+                    ),
                   IconButton(
                     icon: const Icon(Icons.help_outline),
                     tooltip: guide,
