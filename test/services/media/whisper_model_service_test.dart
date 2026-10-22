@@ -43,7 +43,7 @@ void main() {
       expect(WhisperModelService.modelUrl(m, mirror: true).host,
           'hf-mirror.com');
       expect(WhisperModelService.modelUrl(m, mirror: true).path,
-          '/ggml-org/whisper.cpp/resolve/main/ggml-base.bin');
+          '/ggerganov/whisper.cpp/resolve/main/ggml-base.bin');
     });
   });
 

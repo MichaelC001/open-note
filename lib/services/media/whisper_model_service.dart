@@ -34,19 +34,19 @@ class WhisperModelService {
       tier: WhisperModelTier.base,
       fileName: 'ggml-base.bin',
       downloadSizeBytes: 150 * 1024 * 1024,
-      hfRepoPath: 'ggml-org/whisper.cpp/resolve/main/ggml-base.bin',
+      hfRepoPath: 'ggerganov/whisper.cpp/resolve/main/ggml-base.bin',
     ),
     WhisperModelInfo(
       tier: WhisperModelTier.medium,
       fileName: 'ggml-medium.bin',
       downloadSizeBytes: 1600 * 1024 * 1024,
-      hfRepoPath: 'ggml-org/whisper.cpp/resolve/main/ggml-medium.bin',
+      hfRepoPath: 'ggerganov/whisper.cpp/resolve/main/ggml-medium.bin',
     ),
     WhisperModelInfo(
       tier: WhisperModelTier.largeV3Turbo,
       fileName: 'ggml-large-v3-turbo.bin',
       downloadSizeBytes: 1700 * 1024 * 1024,
-      hfRepoPath: 'ggml-org/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin',
+      hfRepoPath: 'ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin',
     ),
   ];
 

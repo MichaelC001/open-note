@@ -136,5 +136,18 @@ void main() {
       await tester.pumpAndSettle();
       expect(tools.checkCount, greaterThan(afterAuto));
     });
+
+    testWidgets('envCheck 错误横幅下内容可滚动不溢出', (tester) async {
+      final provider = makeProvider();
+      await pumpDialogWith(tester, provider);
+      await provider.startForFile(File('/tmp/demo.mp4'));
+      await tester.pumpAndSettle();
+      provider
+        ..errorMessage = '模型下载失败'
+        ..errorDetail = 'Exception: DioException [bad response]: 404';
+      provider.notifyListeners();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
   });
 }

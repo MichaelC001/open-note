@@ -36,52 +36,52 @@ class EnvCheckStep extends StatelessWidget {
     final platformKey = Theme.of(context).platform == TargetPlatform.windows
         ? 'windows'
         : Theme.of(context).platform == TargetPlatform.linux
-            ? 'linux'
-            : 'macos';
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            IconButton(
-              icon: p.busy
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child:
-                          CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.refresh),
-              tooltip: t.media_env_recheck,
-              onPressed: p.busy
-                  ? null
-                  : () => context
-                      .read<MediaImportProvider>()
-                      .checkEnvironment(),
-            ),
-          ],
-        ),
-        if (p.errorMessage != null)
-          _ErrorBanner(message: p.errorMessage!, detail: p.errorDetail),
-        for (final kind in MediaToolKind.values.where(p.isToolRequired))
-          _ToolTile(
-            kind: kind,
-            status: p.toolStatuses[kind],
-            downloading: p.toolDownloading[kind] ?? false,
-            progress: p.toolProgress[kind] ?? 0,
-            guide: _installGuides[kind]![platformKey]!,
+        ? 'linux'
+        : 'macos';
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              IconButton(
+                icon: p.busy
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh),
+                tooltip: t.media_env_recheck,
+                onPressed: p.busy
+                    ? null
+                    : () => context
+                          .read<MediaImportProvider>()
+                          .checkEnvironment(),
+              ),
+            ],
           ),
-        const Divider(height: 24),
-        const _ModelSection(),
-        const SizedBox(height: 12),
-        FilledButton(
-          onPressed:
-              p.environmentReady ? () => _goConfirm(context) : null,
-          child: Text(t.media_confirm_next),
-        ),
-      ],
+          if (p.errorMessage != null)
+            _ErrorBanner(message: p.errorMessage!, detail: p.errorDetail),
+          for (final kind in MediaToolKind.values.where(p.isToolRequired))
+            _ToolTile(
+              kind: kind,
+              status: p.toolStatuses[kind],
+              downloading: p.toolDownloading[kind] ?? false,
+              progress: p.toolProgress[kind] ?? 0,
+              guide: _installGuides[kind]![platformKey]!,
+            ),
+          const Divider(height: 24),
+          const _ModelSection(),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: p.environmentReady ? () => _goConfirm(context) : null,
+            child: Text(t.media_confirm_next),
+          ),
+        ],
+      ),
     );
   }
 
@@ -110,46 +110,57 @@ class _ToolTile extends StatelessWidget {
     final t = Translations.of(context);
     final ready = status?.ready ?? false;
     // whisper.cpp 官方 Release 无 macOS CLI 资产，隐藏应用内下载，仅保留指引
-    final hideDownload = kind == MediaToolKind.whisperCli &&
+    final hideDownload =
+        kind == MediaToolKind.whisperCli &&
         Theme.of(context).platform == TargetPlatform.macOS;
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      leading: Icon(ready ? Icons.check_circle : Icons.error_outline,
-          color: ready ? Colors.green : Colors.orange),
+      leading: Icon(
+        ready ? Icons.check_circle : Icons.error_outline,
+        color: ready ? Colors.green : Colors.orange,
+      ),
       title: Text(switch (kind) {
         MediaToolKind.ffmpeg => 'ffmpeg',
         MediaToolKind.ytDlp => 'yt-dlp',
         MediaToolKind.whisperCli => 'whisper.cpp',
       }),
-      subtitle: Text(ready
-          ? '${t.media_env_ready} · v${status!.version ?? ''}'
-          : t.media_env_missing),
+      subtitle: Text(
+        ready
+            ? '${t.media_env_ready} · v${status!.version ?? ''}'
+            : t.media_env_missing,
+      ),
       trailing: ready
           ? null
           : downloading
-              ? SizedBox(
-                  width: 120,
-                  child: LinearProgressIndicator(value: progress),
-                )
-              : Row(mainAxisSize: MainAxisSize.min, children: [
-                  if (!hideDownload)
-                    TextButton(
-                      onPressed: () => context
-                          .read<MediaImportProvider>()
-                          .downloadTool(kind),
-                      child: Text(t.media_env_download),
-                    ),
-                  IconButton(
-                    icon: const Icon(Icons.help_outline),
-                    tooltip: guide,
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: guide));
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Text(
-                              Translations.of(context).media_env_copied)));
-                    },
+          ? SizedBox(
+              width: 120,
+              child: LinearProgressIndicator(value: progress),
+            )
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!hideDownload)
+                  TextButton(
+                    onPressed: () =>
+                        context.read<MediaImportProvider>().downloadTool(kind),
+                    child: Text(t.media_env_download),
                   ),
-                ]),
+                IconButton(
+                  icon: const Icon(Icons.help_outline),
+                  tooltip: guide,
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: guide));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          Translations.of(context).media_env_copied,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
     );
   }
 }
@@ -164,15 +175,20 @@ class _ModelSection extends StatelessWidget {
     final hasModel = p.downloadedTiers.contains(p.selectedTier);
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      leading: Icon(hasModel ? Icons.check_circle : Icons.download_outlined,
-          color: hasModel ? Colors.green : Colors.orange),
+      leading: Icon(
+        hasModel ? Icons.check_circle : Icons.download_outlined,
+        color: hasModel ? Colors.green : Colors.orange,
+      ),
       title: Text(
-          '${t.media_env_model} · ${WhisperModelService.infoFor(p.selectedTier).displayLabel}'),
+        '${t.media_env_model} · ${WhisperModelService.infoFor(p.selectedTier).displayLabel}',
+      ),
       subtitle: p.modelDownloading
           ? LinearProgressIndicator(value: p.modelProgress)
-          : Text(hasModel
-              ? t.media_env_ready
-              : '~${(WhisperModelService.infoFor(p.selectedTier).downloadSizeBytes / 1024 / 1024).round()} MB'),
+          : Text(
+              hasModel
+                  ? t.media_env_ready
+                  : '~${(WhisperModelService.infoFor(p.selectedTier).downloadSizeBytes / 1024 / 1024).round()} MB',
+            ),
       trailing: hasModel || p.modelDownloading
           ? null
           : TextButton(
@@ -199,8 +215,10 @@ class _ErrorBanner extends StatelessWidget {
         color: Colors.red.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Text('$message${detail == null ? '' : '\n$detail'}',
-          style: const TextStyle(fontSize: 12, color: Colors.red)),
+      child: Text(
+        '$message${detail == null ? '' : '\n$detail'}',
+        style: const TextStyle(fontSize: 12, color: Colors.red),
+      ),
     );
   }
 }
