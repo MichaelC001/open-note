@@ -163,12 +163,12 @@ class MediaImportProvider extends ChangeNotifier {
       _downloadCancel = CancelToken();
       final binName = toolService.binaryName(kind);
       final dest = File('$dir/$binName');
-      final isSingleFile =
-          kind == MediaToolKind.ytDlp ||
-          (kind == MediaToolKind.ffmpeg && !Platform.isWindows);
+      final isSingleFile = kind != MediaToolKind.whisperCli;
       if (isSingleFile) {
         await downloader.download(
-          MediaDownloader.ytDlpDirectUrl(),
+          kind == MediaToolKind.ytDlp
+              ? MediaDownloader.ytDlpDirectUrl()
+              : MediaDownloader.ffmpegDirectUrl(),
           destFile: dest,
           mode: await settings.downloadSource(),
           cancelToken: _downloadCancel,
@@ -185,12 +185,8 @@ class MediaImportProvider extends ChangeNotifier {
           await Process.run('chmod', ['+x', dest.path]);
         }
       } else {
-        final directUrl = kind == MediaToolKind.ffmpeg
-            ? MediaDownloader.ffmpegDirectUrl()
-            : await _resolveWhisperAssetUrl();
-        final archiveName = kind == MediaToolKind.ffmpeg
-            ? 'ffmpeg.zip'
-            : destNameOf(directUrl);
+        final directUrl = await _resolveWhisperAssetUrl();
+        final archiveName = destNameOf(directUrl);
         final archive = File('$dir/$archiveName');
         await downloader.download(
           directUrl,

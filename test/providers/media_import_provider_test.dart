@@ -257,6 +257,39 @@ void main() {
       expect(p.toolStatuses[MediaToolKind.ytDlp]!.ready, isTrue);
     });
   });
+
+  group('ffmpeg 单文件下载 URL 回归', () {
+    test('downloadTool(ffmpeg) 使用 ffmpeg-static 而非 yt-dlp URL', () async {
+      final fake = _CapturingDownloader();
+      final p = MediaImportProvider(
+        toolService: _ReadyToolService(() async => tmp.path),
+        modelService: _AllModelsService(() async => tmp.path),
+        downloader: fake,
+      );
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+      p.toolStatuses[MediaToolKind.ffmpeg] = const MediaToolStatus.missing(
+          MediaToolKind.ffmpeg);
+      await p.downloadTool(MediaToolKind.ffmpeg);
+      expect(fake.lastUrl, contains('/ffmpeg-static/releases/'));
+      expect(fake.lastUrl, isNot(contains('/yt-dlp/')));
+    });
+  });
+}
+
+class _CapturingDownloader extends MediaDownloader {
+  String? lastUrl;
+  @override
+  Future<File> download(
+    String directUrl, {
+    required File destFile,
+    MediaDownloadSourceMode mode = MediaDownloadSourceMode.auto,
+    void Function(int received, int total)? onProgress,
+    CancelToken? cancelToken,
+    String? expectedSha256,
+  }) async {
+    lastUrl = directUrl;
+    return destFile;
+  }
 }
 
 class _HangingDownloader extends MediaDownloader {

@@ -22,6 +22,18 @@ class MediaDownloader {
     'https://ghfast.top/',
   ];
 
+  static const npmmirrorBase =
+      'https://registry.npmmirror.com/-/binary/ffmpeg-static/b6.0/';
+
+  /// ffmpeg-static 资产在 npmmirror 的同名镜像（资产名与 GitHub release 一致）。
+  static List<String> npmmirrorUrls(String directUrl) {
+    final m = RegExp(
+      r'ffmpeg-static/releases/[^/]+/download/(ffmpeg-[a-z0-9-]+)$',
+    ).firstMatch(directUrl);
+    if (m == null) return const [];
+    return ['$npmmirrorBase${m.group(1)}'];
+  }
+
   static List<String> mirrorUrls(String directUrl) {
     if (directUrl.startsWith('https://huggingface.co/')) {
       return [
@@ -31,20 +43,27 @@ class MediaDownloader {
     }
     if (directUrl.startsWith('https://github.com/') ||
         directUrl.startsWith('https://objects.githubusercontent.com/')) {
-      return githubMirrors.map((m) => '$m$directUrl').toList();
+      return [...npmmirrorUrls(directUrl),
+        ...githubMirrors.map((m) => '$m$directUrl')];
     }
     return const [];
   }
 
   static List<String> candidateUrls(
       String directUrl, MediaDownloadSourceMode mode) {
+    final mirrors = mirrorUrls(directUrl);
     switch (mode) {
       case MediaDownloadSourceMode.direct:
         return [directUrl];
       case MediaDownloadSourceMode.mirror:
-        return [...mirrorUrls(directUrl), directUrl];
+        return [...mirrors, directUrl];
       case MediaDownloadSourceMode.auto:
-        return [directUrl, ...mirrorUrls(directUrl)];
+        // npmmirror 为全球 CDN，ffmpeg 候选置首（直连 GitHub 在国内极慢）
+        final npmFirst = mirrors.isNotEmpty &&
+            mirrors.first.startsWith(npmmirrorBase);
+        return npmFirst
+            ? [mirrors.first, directUrl, ...mirrors.skip(1)]
+            : [directUrl, ...mirrors];
     }
   }
 
@@ -57,18 +76,23 @@ class MediaDownloader {
   static String ytDlpDirectUrl() =>
       'https://github.com/yt-dlp/yt-dlp/releases/latest/download/${ytDlpAssetName()}';
 
-  /// Windows=gyan essentials zip（压缩包）；mac/linux=ffmpeg-static 单文件静态二进制。
-  /// （evermeet.cx 的 getrelease/zip 已 410 下线，ffmpeg-static 走 GitHub 可用镜像回退。）
+  /// 三平台统一 ffmpeg-static 单文件静态二进制；npmmirror 镜像置首（b6.0）。
   static String ffmpegDirectUrl() {
-    if (Platform.isWindows) {
-      return 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip';
-    }
-    final arch = Platform.isMacOS ? 'darwin' : 'linux';
+    final arch = Platform.isMacOS
+        ? 'darwin'
+        : Platform.isWindows
+            ? 'win32'
+            : 'linux';
     final isArm = switch (Abi.current()) {
       Abi.macosArm64 || Abi.linuxArm64 => true,
       _ => false,
     };
-    return 'https://github.com/eugeneware/ffmpeg-static/releases/latest/download/ffmpeg-$arch-${isArm ? 'arm64' : 'x64'}';
+    final bits = Platform.isWindows
+        ? 'x64'
+        : isArm
+            ? 'arm64'
+            : 'x64';
+    return 'https://github.com/eugeneware/ffmpeg-static/releases/latest/download/ffmpeg-$arch-$bits';
   }
 
   static String whisperReleasesApiUrl() =>
