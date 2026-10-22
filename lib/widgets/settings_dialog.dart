@@ -18,6 +18,7 @@ import '../utils/app_info.dart';
 import 'settings/preferences_tab.dart';
 import 'settings/knowledge_base_tab.dart';
 import 'settings/assistant_settings_tab.dart';
+import 'settings/video_note_tab.dart';
 import 'cli_install_dialog.dart';
 import '../services/cli_install_service.dart';
 
@@ -51,6 +52,11 @@ class _SettingsDialogState extends State<SettingsDialog> {
       _SettingsItem(
         title: t.settings_knowledgeBase,
         icon: Icons.library_books_outlined,
+        enabled: true,
+      ),
+      _SettingsItem(
+        title: t.media_settings_title,
+        icon: Icons.smart_display,
         enabled: true,
       ),
       _SettingsItem(
@@ -116,12 +122,23 @@ class _SettingsDialogState extends State<SettingsDialog> {
             ),
           ),
           const SizedBox(height: 8),
-          ...List.generate(settingsItems.length, (index) {
-            final item = settingsItems[index];
-            final isSelected = _selectedIndex == index;
-            return _buildNavItem(context, item, index, isSelected, t);
-          }),
-          const Spacer(),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var index = 0; index < settingsItems.length; index++)
+                    _buildNavItem(
+                      context,
+                      settingsItems[index],
+                      index,
+                      _selectedIndex == index,
+                      t,
+                    ),
+                ],
+              ),
+            ),
+          ),
           _buildGitHubLink(context),
           const SizedBox(height: 4),
           _buildOfficialLink(context),
@@ -386,8 +403,10 @@ class _SettingsDialogState extends State<SettingsDialog> {
       case 3:
         return const KnowledgeBaseTab();
       case 4:
-        return const AssistantSettingsTab();
+        return const VideoNoteTab();
       case 5:
+        return const AssistantSettingsTab();
+      case 6:
         return _buildCLISettings(context, t);
       default:
         return Center(
@@ -1046,13 +1065,13 @@ class _SettingsDialogState extends State<SettingsDialog> {
                       title: Text(t.common_edit),
                     ),
                   ),
-PopupMenuItem(
-                      value: 'manage_models',
-                      child: ListTile(
-                        leading: const Icon(Icons.list),
-                        title: Text(t.common_manageModels),
-                      ),
+                  PopupMenuItem(
+                    value: 'manage_models',
+                    child: ListTile(
+                      leading: const Icon(Icons.list),
+                      title: Text(t.common_manageModels),
                     ),
+                  ),
                   PopupMenuItem(
                     value: 'test',
                     child: ListTile(
