@@ -28,7 +28,12 @@ class _CountingToolService extends MediaToolService {
   Future<MediaToolStatus> check(MediaToolKind kind) async {
     checkCount++;
     if (allReady) {
-      return MediaToolStatus(kind: kind, ready: true, version: '1.0');
+      return MediaToolStatus(
+        kind: kind,
+        ready: true,
+        version: '1.0',
+        source: MediaToolSource.appManaged,
+      );
     }
     return MediaToolStatus.missing(kind);
   }
@@ -167,8 +172,16 @@ void main() {
   });
 
   testWidgets('显示模型下载目录并可复制', (tester) async {
+    String? clipboardText;
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        SystemChannels.platform, (call) async => null);
+        SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        clipboardText = (call.arguments as Map)['text'] as String?;
+      }
+      return null;
+    });
+    addTearDown(() => tester.binding.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, null));
     final provider = makeProvider(toolsReady: true);
     await pumpTab(tester, provider);
     await provider.checkEnvironment();
@@ -178,6 +191,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.copy));
     await tester.pump();
     expect(find.byType(SnackBar), findsOneWidget);
+    expect(clipboardText, '${tmpModels.path}/whisper_models');
     // 冲洗 SnackBar 自动消失 Timer（4s）及其退场动画，避免 pending timer
     await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
@@ -191,5 +205,33 @@ void main() {
     await tester.tap(find.byIcon(Icons.refresh));
     await tester.pumpAndSettle();
     expect(toolsFake.checkCount, greaterThan(before));
+  });
+
+  testWidgets('appManaged 就绪工具显示卸载按钮，确认后调用卸载', (tester) async {
+    final provider = makeProvider(toolsReady: true);
+    await pumpTab(tester, provider);
+    await provider.checkEnvironment();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.delete_outline).first);
+    await tester.pumpAndSettle();
+    expect(find.text('确定卸载 ffmpeg？'), findsOneWidget);
+    await tester.tap(find.text('卸载').last);
+    await tester.pumpAndSettle();
+    // fake 工具目录被删 → check 后 fake 恒 ready，仅验证无错误弹出
+    expect(find.byType(AlertDialog), findsNothing);
+  });
+
+  testWidgets('已就绪模型行显示删除按钮，确认后移出列表', (tester) async {
+    final provider = makeProvider(toolsReady: true);
+    await pumpTab(tester, provider);
+    await provider.checkEnvironment();
+    await tester.pumpAndSettle();
+    // 模型行删除按钮（tooltip=删除）共 3 个，first 为 base 行
+    await tester.tap(find.byTooltip('删除').first);
+    await tester.pumpAndSettle();
+    expect(find.text('确定删除模型 base？'), findsOneWidget);
+    await tester.tap(find.text('删除').last);
+    await tester.pumpAndSettle();
+    expect(provider.downloadedTiers.contains(WhisperModelTier.base), isFalse);
   });
 }

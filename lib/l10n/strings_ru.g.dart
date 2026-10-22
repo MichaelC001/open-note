@@ -1794,6 +1794,11 @@ class TranslationsRu extends Translations with BaseTranslations<AppLocale, Trans
 	@override String media_dl_eta({required Object time}) => 'осталось ${time}';
 	@override String get media_env_autoInstall => 'Автоустановка';
 	@override String get media_settings_copyPath => 'Копировать путь';
+	@override String media_env_uninstallConfirmTitle({required Object name}) => 'Удалить ${name}?';
+	@override String get media_env_uninstallConfirmBody => 'Файлы приложения будут удалены; переустановка возможна в любой момент.';
+	@override String media_env_modelDeleteConfirmTitle({required Object name}) => 'Удалить модель ${name}?';
+	@override String get media_env_modelDeleteConfirmBody => 'Скачанный файл модели будет удалён; повторная загрузка доступна в любой момент.';
+	@override String get media_env_useManager => 'Установлено системным менеджером пакетов; удаление через терминал.';
 	@override String get media_env_background => 'Загрузка продолжается в фоне: Настройки → Видео в заметку.';
 	@override String get media_env_uninstall => 'Удалить';
 	@override String get media_env_finishing => 'Скачано · Установка…';

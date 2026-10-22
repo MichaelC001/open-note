@@ -3030,6 +3030,21 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 	/// zh: '复制路径'
 	String get media_settings_copyPath => '复制路径';
 
+	/// zh: '确定卸载 {name}？'
+	String media_env_uninstallConfirmTitle({required Object name}) => '确定卸载 ${name}？';
+
+	/// zh: '将删除应用内安装的文件，之后可随时重新下载。'
+	String get media_env_uninstallConfirmBody => '将删除应用内安装的文件，之后可随时重新下载。';
+
+	/// zh: '确定删除模型 {name}？'
+	String media_env_modelDeleteConfirmTitle({required Object name}) => '确定删除模型 ${name}？';
+
+	/// zh: '将删除已下载的模型文件，需要时可重新下载。'
+	String get media_env_modelDeleteConfirmBody => '将删除已下载的模型文件，需要时可重新下载。';
+
+	/// zh: '通过系统包管理器安装，请在终端用对应命令卸载'
+	String get media_env_useManager => '通过系统包管理器安装，请在终端用对应命令卸载';
+
 	/// zh: '下载已在后台进行，可在 设置→视频转笔记 查看进度'
 	String get media_env_background => '下载已在后台进行，可在 设置→视频转笔记 查看进度';
 

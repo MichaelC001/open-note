@@ -2359,6 +2359,13 @@
   "@media_dl_eta": { "parameters": { "time": "String" } },
   "media_env_autoInstall": "Auto-install",
   "media_settings_copyPath": "Copy path",
+  "media_env_uninstallConfirmTitle": "Uninstall {name}?",
+  "@media_env_uninstallConfirmTitle": { "parameters": { "name": "String" } },
+  "media_env_uninstallConfirmBody": "This removes app-managed files. You can reinstall anytime.",
+  "media_env_modelDeleteConfirmTitle": "Delete model {name}?",
+  "@media_env_modelDeleteConfirmTitle": { "parameters": { "name": "String" } },
+  "media_env_modelDeleteConfirmBody": "The downloaded model file will be removed. You can re-download it anytime.",
+  "media_env_useManager": "Installed via a system package manager; uninstall from the terminal.",
   "media_env_background":
       "Download continues in the background. Check Settings → Video to Note for progress.",
   "media_env_uninstall": "Uninstall",

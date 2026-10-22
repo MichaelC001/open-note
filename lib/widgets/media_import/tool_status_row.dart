@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../../l10n/strings.g.dart';
 import '../../services/media/download_stats.dart';
 import '../../services/media/media_tool_service.dart';
+import '../../theme/design_tokens.dart';
 
 const Map<MediaToolKind, Map<String, String>> installGuides = {
   MediaToolKind.ffmpeg: {
@@ -82,6 +83,7 @@ class ToolStatusRow extends StatelessWidget {
   final DownloadStatus? downloadStatus;
   final bool autoInstalling;
   final bool uninstalling;
+  final String? systemHint;
   final String guide;
   final VoidCallback? onAutoInstall;
   final VoidCallback? onDownload;
@@ -96,6 +98,7 @@ class ToolStatusRow extends StatelessWidget {
     this.downloadStatus,
     required this.autoInstalling,
     this.uninstalling = false,
+    this.systemHint,
     required this.guide,
     this.onAutoInstall,
     this.onDownload,
@@ -142,21 +145,40 @@ class ToolStatusRow extends StatelessWidget {
           ? DownloadProgressText(
               status: downloadStatus ?? const DownloadStatus(),
             )
-          : Text(
-              ready
-                  ? '${t.media_env_ready} · v${status!.version ?? ''}'
-                  : t.media_env_missing,
-            ),
+          : ready
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${t.media_env_ready} · v${status!.version ?? ''}'),
+                if (systemHint != null)
+                  Text(
+                    systemHint!,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: DesignTokens.gray500,
+                    ),
+                  ),
+              ],
+            )
+          : Text(t.media_env_missing),
       trailing: uninstalling
           ? const SizedBox(
               width: 14,
               height: 14,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
-          : ready || downloading
+          : downloading
           ? null
+          : ready
+          ? onUninstall != null
+                ? IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    tooltip: t.media_env_uninstall,
+                    onPressed: onUninstall,
+                  )
+                : null
           : autoInstalling
-          ? Row(
+            ? Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const SizedBox(
@@ -168,8 +190,6 @@ class ToolStatusRow extends StatelessWidget {
                 Text(t.media_env_installing),
               ],
             )
-          : downloading
-          ? null
           : Row(
               mainAxisSize: MainAxisSize.min,
               children: [

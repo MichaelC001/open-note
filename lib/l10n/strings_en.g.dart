@@ -1800,6 +1800,11 @@ class TranslationsEn extends Translations with BaseTranslations<AppLocale, Trans
 	@override String media_dl_eta({required Object time}) => '${time} left';
 	@override String get media_env_autoInstall => 'Auto-install';
 	@override String get media_settings_copyPath => 'Copy path';
+	@override String media_env_uninstallConfirmTitle({required Object name}) => 'Uninstall ${name}?';
+	@override String get media_env_uninstallConfirmBody => 'This removes app-managed files. You can reinstall anytime.';
+	@override String media_env_modelDeleteConfirmTitle({required Object name}) => 'Delete model ${name}?';
+	@override String get media_env_modelDeleteConfirmBody => 'The downloaded model file will be removed. You can re-download it anytime.';
+	@override String get media_env_useManager => 'Installed via a system package manager; uninstall from the terminal.';
 	@override String get media_env_background => 'Download continues in the background. Check Settings → Video to Note for progress.';
 	@override String get media_env_uninstall => 'Uninstall';
 	@override String get media_env_finishing => 'Downloaded · Installing…';

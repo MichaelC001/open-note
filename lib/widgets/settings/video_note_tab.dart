@@ -88,21 +88,9 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
             if (p.errorMessage != null)
               ErrorBanner(message: p.errorMessage!, detail: p.errorDetail),
             for (final kind in MediaToolKind.values)
-              ToolStatusRow(
-                kind: kind,
-                status: p.toolStatuses[kind],
-                downloading: p.toolDownloading[kind] ?? false,
-                finishing: p.toolFinishing[kind] ?? false,
-                downloadStatus: p.toolDownloadStatus[kind],
-                autoInstalling: p.toolInstalling[kind] ?? false,
-                guide: installGuides[kind]![platformKey]!,
-                onAutoInstall: ToolStatusRow.canAutoInstall(kind, platformKey)
-                    ? () => p.autoInstallTool(kind)
-                    : null,
-                onDownload: () => p.downloadTool(kind),
-              ),
+              _toolRow(context, p, t, platformKey, kind),
             const Divider(height: 24),
-            const ModelList(),
+            ModelList(onDelete: (tier) => _confirmDeleteModel(context, p, tier)),
             const SizedBox(height: 8),
             FutureBuilder<String>(
               future: widget.modelService.modelsDir(),
@@ -212,6 +200,91 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
         ],
       ),
     );
+  }
+
+  Widget _toolRow(BuildContext context, MediaImportProvider p, Translations t,
+      String platformKey, MediaToolKind kind) {
+    final st = p.toolStatuses[kind];
+    final canUninstall = _uninstallable(context, p, kind);
+    return ToolStatusRow(
+      kind: kind,
+      status: st,
+      downloading: p.toolDownloading[kind] ?? false,
+      finishing: p.toolFinishing[kind] ?? false,
+      downloadStatus: p.toolDownloadStatus[kind],
+      autoInstalling: p.toolInstalling[kind] ?? false,
+      uninstalling: p.toolUninstalling[kind] ?? false,
+      systemHint: (st?.ready ?? false) &&
+              st?.source == MediaToolSource.systemPath &&
+              !canUninstall
+          ? t.media_env_useManager
+          : null,
+      guide: installGuides[kind]![platformKey]!,
+      onAutoInstall: ToolStatusRow.canAutoInstall(kind, platformKey)
+          ? () => p.autoInstallTool(kind)
+          : null,
+      onDownload: () => p.downloadTool(kind),
+      onUninstall:
+          canUninstall ? () => _confirmUninstall(context, p, kind) : null,
+    );
+  }
+
+  bool _uninstallable(BuildContext context, MediaImportProvider p,
+      MediaToolKind kind) {
+    final st = p.toolStatuses[kind];
+    if (st == null || !st.ready) return false;
+    if (st.source == MediaToolSource.appManaged) return true;
+    return Theme.of(context).platform == TargetPlatform.macOS ||
+        (Theme.of(context).platform == TargetPlatform.windows &&
+            kind == MediaToolKind.whisperCli);
+  }
+
+  Future<void> _confirmUninstall(
+      BuildContext context, MediaImportProvider p, MediaToolKind kind) async {
+    final t = Translations.of(context);
+    final name = switch (kind) {
+      MediaToolKind.ffmpeg => 'ffmpeg',
+      MediaToolKind.ytDlp => 'yt-dlp',
+      MediaToolKind.whisperCli => 'whisper.cpp',
+    };
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.media_env_uninstallConfirmTitle(name: name)),
+        content: Text(t.media_env_uninstallConfirmBody),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(t.common_cancel)),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(t.media_env_uninstall)),
+        ],
+      ),
+    );
+    if (ok == true) await p.uninstallTool(kind);
+  }
+
+  Future<void> _confirmDeleteModel(
+      BuildContext context, MediaImportProvider p, WhisperModelTier tier) async {
+    final t = Translations.of(context);
+    final label = WhisperModelService.infoFor(tier).displayLabel;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.media_env_modelDeleteConfirmTitle(name: label)),
+        content: Text(t.media_env_modelDeleteConfirmBody),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(t.common_cancel)),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(t.common_delete)),
+        ],
+      ),
+    );
+    if (ok == true) await p.deleteModel(tier);
   }
 
   Widget _card(bool isDark, List<Widget> children) => Container(

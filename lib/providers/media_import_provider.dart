@@ -51,6 +51,8 @@ class MediaImportProvider extends ChangeNotifier {
   final Map<MediaToolKind, bool> toolDownloading = {};
   final Map<MediaToolKind, bool> toolFinishing = {};
   final Map<MediaToolKind, bool> toolInstalling = {};
+  final Map<MediaToolKind, bool> toolUninstalling = {};
+  bool modelDeleting = false;
   final Map<MediaToolKind, DownloadStatus> toolDownloadStatus = {};
   final Map<String, DownloadSpeedTracker> _downloadTrackers = {};
 
@@ -76,6 +78,8 @@ class MediaImportProvider extends ChangeNotifier {
   bool _busy = false;
 
   bool get busy => _busy;
+
+  bool get transcriptionActive => _activeService != null;
 
   String pendingLanguage = 'auto';
 
@@ -271,6 +275,102 @@ class MediaImportProvider extends ChangeNotifier {
     } finally {
       toolInstalling[kind] = false;
       _activeInstaller = null;
+      _notify();
+    }
+  }
+
+  /// 卸载计划：mac 走 brew（ffmpeg/yt-dlp/whisper-cpp），windows 仅 whisper-cli 走 winget。
+  static InstallerPlan? uninstallPlan(
+    MediaToolKind kind, {
+    String? brewPath,
+    required bool isMac,
+    required bool isWin,
+  }) {
+    if (isMac) {
+      if (brewPath == null || brewPath.isEmpty) return null;
+      final name = switch (kind) {
+        MediaToolKind.ffmpeg => 'ffmpeg',
+        MediaToolKind.ytDlp => 'yt-dlp',
+        MediaToolKind.whisperCli => 'whisper-cpp',
+      };
+      return InstallerPlan(brewPath, ['uninstall', '-q', name]);
+    }
+    if (isWin && kind == MediaToolKind.whisperCli) {
+      return const InstallerPlan('winget', [
+        'uninstall', '--id', 'ggml.whisper-cpp', '-e', '--disable-interactivity',
+      ]);
+    }
+    return null;
+  }
+
+  Future<void> uninstallTool(MediaToolKind kind) async {
+    final status = toolStatuses[kind];
+    if (status == null || !status.ready) return;
+    if ((toolDownloading[kind] ?? false) ||
+        (toolInstalling[kind] ?? false) ||
+        (toolFinishing[kind] ?? false)) {
+      return;
+    }
+    toolUninstalling[kind] = true;
+    errorMessage = null;
+    errorDetail = null;
+    _notify();
+    try {
+      if (status.source == MediaToolSource.appManaged) {
+        // 同步删除：FakeAsync（widget 测试）下 dart:io 异步方法无法完成
+        final dir = Directory(await toolService.toolDir(kind));
+        if (dir.existsSync()) dir.deleteSync(recursive: true);
+      } else {
+        final brewPath = Platform.isMacOS ? await brewPathResolver() : null;
+        final plan = uninstallPlan(
+          kind,
+          brewPath: brewPath,
+          isMac: Platform.isMacOS,
+          isWin: Platform.isWindows,
+        );
+        if (plan == null) {
+          errorMessage = '无法自动卸载';
+          errorDetail = '请使用对应包管理器卸载';
+          return;
+        }
+        final r = await installerRunner(plan.executable, plan.args);
+        if (r.exitCode != 0) {
+          errorMessage = '自动卸载失败';
+          errorDetail =
+              (r.stderr.trim().isNotEmpty ? r.stderr : r.stdout).trim();
+          return;
+        }
+      }
+      toolStatuses[kind] = await toolService.check(kind);
+    } catch (e) {
+      errorMessage = '卸载失败';
+      errorDetail = e.toString();
+    } finally {
+      toolUninstalling[kind] = false;
+      _activeInstaller = null;
+      _notify();
+    }
+  }
+
+  Future<void> deleteModel(WhisperModelTier tier) async {
+    if (_activeService != null) {
+      errorMessage = '转录进行中，无法删除模型';
+      _notify();
+      return;
+    }
+    if (modelDeleting || !downloadedTiers.contains(tier)) return;
+    modelDeleting = true;
+    _notify();
+    try {
+      final info = WhisperModelService.infoFor(tier);
+      final f = File('${await modelService.modelsDir()}/${info.fileName}');
+      if (f.existsSync()) f.deleteSync();
+      downloadedTiers.remove(tier);
+    } catch (e) {
+      errorMessage = '删除模型失败';
+      errorDetail = e.toString();
+    } finally {
+      modelDeleting = false;
       _notify();
     }
   }

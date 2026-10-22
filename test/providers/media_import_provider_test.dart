@@ -48,6 +48,24 @@ class _AllModelsService extends WhisperModelService {
   Future<File?> localModelFile(WhisperModelTier tier) async => File('m.bin');
 }
 
+class _SystemToolService extends _ReadyToolService {
+  _SystemToolService(super.base);
+  @override
+  Future<MediaToolStatus> check(MediaToolKind kind) async {
+    checkCount++;
+    return MediaToolStatus(
+      kind: kind, ready: true, path: '/usr/bin/${kind.name}',
+      version: '1', source: MediaToolSource.systemPath);
+  }
+}
+
+class _RealAllModelsService extends WhisperModelService {
+  _RealAllModelsService(Future<String> Function() base) : super(resolveBaseDir: base);
+  @override
+  Future<WhisperModelTier> recommendTierForDevice() async => WhisperModelTier.base;
+  // localModelFile 用真实实现（基于 modelsDir 文件存在性）
+}
+
 void main() {
   late Directory tmp;
   setUp(() {
@@ -255,6 +273,103 @@ void main() {
       await run;
       expect(p.toolFinishing[MediaToolKind.ytDlp] ?? false, isFalse);
       expect(p.toolStatuses[MediaToolKind.ytDlp]!.ready, isTrue);
+    });
+  });
+
+  group('uninstallPlan 纯函数', () {
+    test('mac 有 brew：三种工具都有 brew uninstall 计划', () {
+      final ffmpegPlan = MediaImportProvider.uninstallPlan(MediaToolKind.ffmpeg,
+          brewPath: '/opt/homebrew/bin/brew', isMac: true, isWin: false);
+      expect(ffmpegPlan!.executable, '/opt/homebrew/bin/brew');
+      expect(ffmpegPlan.args, ['uninstall', '-q', 'ffmpeg']);
+      expect(
+          MediaImportProvider.uninstallPlan(MediaToolKind.whisperCli,
+              brewPath: '/brew', isMac: true, isWin: false)!.args
+              .last, 'whisper-cpp');
+    });
+    test('mac 无 brew / linux：返回 null', () {
+      expect(
+          MediaImportProvider.uninstallPlan(MediaToolKind.ffmpeg,
+              brewPath: null, isMac: true, isWin: false), isNull);
+      expect(
+          MediaImportProvider.uninstallPlan(MediaToolKind.ffmpeg,
+              brewPath: '/brew', isMac: false, isWin: false), isNull);
+    });
+    test('windows：仅 whisper-cli 有 winget 计划', () {
+      expect(
+          MediaImportProvider.uninstallPlan(MediaToolKind.whisperCli,
+              isMac: false, isWin: true)!.executable, 'winget');
+      expect(
+          MediaImportProvider.uninstallPlan(MediaToolKind.ffmpeg,
+              isMac: false, isWin: true), isNull);
+    });
+  });
+
+  group('uninstallTool / deleteModel', () {
+    test('appManaged：删除 toolDir 内容并重查', () async {
+      final tools = _ReadyToolService(() async => tmp.path);
+      final p = MediaImportProvider(
+          toolService: tools, modelService: _AllModelsService(() async => tmp.path));
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+      final bin = File(
+          '${await tools.toolDir(MediaToolKind.whisperCli)}/${tools.binaryName(MediaToolKind.whisperCli)}');
+      await bin.create(recursive: true);
+      await p.uninstallTool(MediaToolKind.whisperCli);
+      expect(bin.existsSync(), isFalse);
+      expect(p.errorMessage, isNull);
+      expect(p.toolUninstalling[MediaToolKind.whisperCli] ?? false, isFalse);
+    });
+
+    test('systemPath：mac 调 brew uninstall，失败写 errorMessage', () async {
+      String? capturedExe; List<String>? capturedArgs;
+      final sysTool = _SystemToolService(() async => tmp.path);
+      final p = MediaImportProvider(
+        toolService: sysTool,
+        modelService: _AllModelsService(() async => tmp.path),
+        installerRunner: (exe, args) async {
+          capturedExe = exe; capturedArgs = args;
+          return const ProcessRunResult(1, '', 'No such keg');
+        },
+        brewPathResolver: () async => '/fake/brew',
+      );
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+      await p.uninstallTool(MediaToolKind.ffmpeg);
+      expect(capturedExe, '/fake/brew');
+      expect(capturedArgs, containsAll(['uninstall', '-q', 'ffmpeg']));
+      expect(p.errorMessage, '自动卸载失败');
+      expect(p.errorDetail, contains('No such keg'));
+    });
+
+    test('deleteModel：删除文件并移出 downloadedTiers；转录中阻止', () async {
+      final models = _RealAllModelsService(() async => tmp.path);
+      final p = MediaImportProvider(
+          toolService: _ReadyToolService(() async => tmp.path),
+          modelService: models);
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+      final f = File(
+          '${await models.modelsDir()}/${WhisperModelService.infoFor(WhisperModelTier.base).fileName}');
+      await f.create(recursive: true);
+      p.downloadedTiers.add(WhisperModelTier.base);
+      expect(p.downloadedTiers.contains(WhisperModelTier.base), isTrue);
+      await p.deleteModel(WhisperModelTier.base);
+      expect(f.existsSync(), isFalse);
+      expect(p.downloadedTiers.contains(WhisperModelTier.base), isFalse);
+
+      // 转录中守卫
+      await f.create(recursive: true);
+      p.downloadedTiers.add(WhisperModelTier.base);
+      await p.confirmAndStart(
+        runOverride: (_, _) async {
+          await Future.delayed(const Duration(seconds: 5));
+          throw StateError('unreachable');
+        },
+        saveNote: (r) async => null,
+        waitCompletion: false,
+      );
+      await p.deleteModel(WhisperModelTier.base);
+      expect(p.errorMessage, '转录进行中，无法删除模型');
+      expect(f.existsSync(), isTrue);
+      p.cancel();
     });
   });
 
