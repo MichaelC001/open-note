@@ -1,5 +1,6 @@
 // lib/providers/media_import_provider.dart
 import 'dart:async';
+import 'dart:ffi';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -262,9 +263,15 @@ class MediaImportProvider extends ChangeNotifier {
         '${resp.data['tag_name']}/$asset';
   }
 
+  /// Dart 进程真实架构（Rosetta 下 x64 进程选 x64 包恰好正确）。
   static bool get _isArmHost {
-    final s = Platform.operatingSystemVersion.toLowerCase();
-    return s.contains('arm64') || s.contains('aarch64');
+    if (Platform.isMacOS || Platform.isLinux) {
+      return switch (Abi.current()) {
+        Abi.macosArm64 || Abi.linuxArm64 => true,
+        _ => false,
+      };
+    }
+    return false;
   }
 
   static String destNameOf(String url) {
