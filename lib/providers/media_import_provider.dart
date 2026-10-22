@@ -142,7 +142,9 @@ class MediaImportProvider extends ChangeNotifier {
       _downloadCancel = CancelToken();
       final binName = toolService.binaryName(kind);
       final dest = File('$dir/$binName');
-      if (kind == MediaToolKind.ytDlp) {
+      final isSingleFile = kind == MediaToolKind.ytDlp ||
+          (kind == MediaToolKind.ffmpeg && !Platform.isWindows);
+      if (isSingleFile) {
         await downloader.download(
           MediaDownloader.ytDlpDirectUrl(),
           destFile: dest,

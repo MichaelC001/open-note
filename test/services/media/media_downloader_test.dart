@@ -1,4 +1,5 @@
 // test/services/media/media_downloader_test.dart
+import 'dart:ffi' as ffi;
 import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -47,15 +48,20 @@ void main() {
         expect(name, 'yt-dlp_linux');
       }
     });
-    test('ffmpeg 直链按平台', () {
+    test('ffmpeg 直链按平台（win=gyan zip，mac/linux=ffmpeg-static 单文件）', () {
+      final url = MediaDownloader.ffmpegDirectUrl();
       if (Platform.isWindows) {
-        expect(MediaDownloader.ffmpegDirectUrl(),
-            contains('ffmpeg-release-essentials.zip'));
+        expect(url, contains('ffmpeg-release-essentials.zip'));
       } else if (Platform.isMacOS) {
-        expect(MediaDownloader.ffmpegDirectUrl(), contains('evermeet'));
+        expect(url,
+            contains('ffmpeg-static/releases/latest/download/ffmpeg-darwin-'));
+        final isArm = switch (ffi.Abi.current()) {
+          ffi.Abi.macosArm64 || ffi.Abi.linuxArm64 => true,
+          _ => false,
+        };
+        expect(url.endsWith(isArm ? 'arm64' : 'x64'), isTrue);
       } else {
-        expect(() => MediaDownloader.ffmpegDirectUrl(),
-            throwsUnsupportedError);
+        expect(url, contains('ffmpeg-linux-'));
       }
     });
     test('pickWhisperAsset 用 b5454 真实资产列表命中与排除', () {

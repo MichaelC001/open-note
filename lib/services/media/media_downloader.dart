@@ -1,4 +1,5 @@
 // lib/services/media/media_downloader.dart
+import 'dart:ffi';
 import 'dart:io';
 
 import 'package:archive/archive_io.dart';
@@ -56,14 +57,18 @@ class MediaDownloader {
   static String ytDlpDirectUrl() =>
       'https://github.com/yt-dlp/yt-dlp/releases/latest/download/${ytDlpAssetName()}';
 
+  /// Windows=gyan essentials zip（压缩包）；mac/linux=ffmpeg-static 单文件静态二进制。
+  /// （evermeet.cx 的 getrelease/zip 已 410 下线，ffmpeg-static 走 GitHub 可用镜像回退。）
   static String ffmpegDirectUrl() {
     if (Platform.isWindows) {
       return 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip';
     }
-    if (Platform.isMacOS) {
-      return 'https://evermeet.cx/ffmpeg/getrelease/zip';
-    }
-    throw UnsupportedError('Linux 不提供 ffmpeg 便携版，请使用系统包管理器安装');
+    final arch = Platform.isMacOS ? 'darwin' : 'linux';
+    final isArm = switch (Abi.current()) {
+      Abi.macosArm64 || Abi.linuxArm64 => true,
+      _ => false,
+    };
+    return 'https://github.com/eugeneware/ffmpeg-static/releases/latest/download/ffmpeg-$arch-${isArm ? 'arm64' : 'x64'}';
   }
 
   static String whisperReleasesApiUrl() =>
