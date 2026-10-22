@@ -2358,6 +2358,7 @@
   "media_dl_eta": "剩余 {time}",
   "@media_dl_eta": { "parameters": { "time": "String" } },
   "media_env_autoInstall": "一键安装",
+  "media_env_uninstall": "卸载",
   "media_env_finishing": "下载完成 · 安装中…",
   "media_env_recommended": "推荐",
   "media_env_installing": "安装中…",

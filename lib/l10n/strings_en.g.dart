@@ -1799,6 +1799,7 @@ class TranslationsEn extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get media_settings_defaultModelAuto => 'Auto recommend';
 	@override String media_dl_eta({required Object time}) => '${time} left';
 	@override String get media_env_autoInstall => 'Auto-install';
+	@override String get media_env_uninstall => 'Uninstall';
 	@override String get media_env_finishing => 'Downloaded · Installing…';
 	@override String get media_env_recommended => 'Recommended';
 	@override String get media_env_installing => 'Installing…';

@@ -3027,6 +3027,9 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 	/// zh: '一键安装'
 	String get media_env_autoInstall => '一键安装';
 
+	/// zh: '卸载'
+	String get media_env_uninstall => '卸载';
+
 	/// zh: '下载完成 · 安装中…'
 	String get media_env_finishing => '下载完成 · 安装中…';
 
