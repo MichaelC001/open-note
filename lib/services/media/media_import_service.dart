@@ -15,6 +15,8 @@ import 'wav_duration.dart';
 enum MediaImportPhase { acquiring, extractingAudio, transcribing, formatting }
 
 class MediaImportException implements Exception {
+  static const String cancelledMessage = '已取消';
+
   final String message;
   final String? detail;
 
@@ -70,10 +72,10 @@ class MediaImportService {
     WhisperRunner? whisperRunner,
     this.formatter,
     Future<String> Function()? resolveBaseDir,
-  })  : toolService = toolService ?? MediaToolService(),
-        modelService = modelService ?? WhisperModelService(),
-        whisperRunner = whisperRunner ?? WhisperRunner(),
-        resolveBaseDir = resolveBaseDir ?? _defaultBaseDir;
+  }) : toolService = toolService ?? MediaToolService(),
+       modelService = modelService ?? WhisperModelService(),
+       whisperRunner = whisperRunner ?? WhisperRunner(),
+       resolveBaseDir = resolveBaseDir ?? _defaultBaseDir;
 
   static Future<String> _defaultBaseDir() async =>
       (await getApplicationSupportDirectory()).path;
@@ -87,7 +89,9 @@ class MediaImportService {
   }
 
   void _ensureAlive() {
-    if (_cancelled) throw const MediaImportException('已取消');
+    if (_cancelled) {
+      throw const MediaImportException(MediaImportException.cancelledMessage);
+    }
   }
 
   static String deriveTitleFromMedia(String mediaPath) {
@@ -99,8 +103,7 @@ class MediaImportService {
   }
 
   static int? parseFfmpegDurationSec(String stderr) {
-    final m =
-        RegExp(r'Duration:\s*(\d+):(\d+):(\d+)\.\d+').firstMatch(stderr);
+    final m = RegExp(r'Duration:\s*(\d+):(\d+):(\d+)\.\d+').firstMatch(stderr);
     if (m == null) return null;
     return int.parse(m.group(1)!) * 3600 +
         int.parse(m.group(2)!) * 60 +
@@ -111,7 +114,8 @@ class MediaImportService {
     double? latest;
     final re = RegExp(r'time=(\d+):(\d+):(\d+)\.(\d+)');
     for (final m in re.allMatches(chunk)) {
-      latest = int.parse(m.group(1)!) * 3600 +
+      latest =
+          int.parse(m.group(1)!) * 3600 +
           int.parse(m.group(2)!) * 60 +
           int.parse(m.group(3)!) +
           int.parse(m.group(4)!) / 100.0;
@@ -124,8 +128,9 @@ class MediaImportService {
     void Function(MediaImportPhase phase, double? progress)? onProgress,
   }) async {
     final taskId = const Uuid().v4();
-    final tmpRoot =
-        Directory('${await resolveBaseDir()}/media_import_tmp/$taskId');
+    final tmpRoot = Directory(
+      '${await resolveBaseDir()}/media_import_tmp/$taskId',
+    );
     await tmpRoot.create(recursive: true);
     try {
       onProgress?.call(MediaImportPhase.acquiring, null);
@@ -187,11 +192,13 @@ class MediaImportService {
       }
 
       if (!req.deleteSourceAfter) {
-        final keepRoot =
-            Directory('${await resolveBaseDir()}/media_import_media');
+        final keepRoot = Directory(
+          '${await resolveBaseDir()}/media_import_media',
+        );
         await keepRoot.create(recursive: true);
         final dest = File(
-            '${keepRoot.path}/${DateTime.now().millisecondsSinceEpoch}_${mediaFile.uri.pathSegments.last}');
+          '${keepRoot.path}/${DateTime.now().millisecondsSinceEpoch}_${mediaFile.uri.pathSegments.last}',
+        );
         try {
           await mediaFile.copy(dest.path);
         } catch (_) {}
@@ -220,8 +227,11 @@ class MediaImportService {
   static Future<String> _neverCall(String p) async =>
       throw UnsupportedError('fallback only');
 
-  Future<File> _acquire(MediaImportRequest req, Directory workDir,
-      void Function(double) onProgress) async {
+  Future<File> _acquire(
+    MediaImportRequest req,
+    Directory workDir,
+    void Function(double) onProgress,
+  ) async {
     if (req.localFile != null) return req.localFile!;
     final url = req.url;
     if (url == null || url.isEmpty) {
@@ -231,17 +241,17 @@ class MediaImportService {
     if (!yt.ready || yt.path == null) {
       throw const MediaImportException('yt-dlp 未安装，请先在环境检查中安装');
     }
-    final process = await Process.start(
-        yt.path!,
-        [
-          '--no-playlist',
-          '--newline',
-          '-f', 'ba/b',
-          '-o', '%(title).80s [%(id)s].%(ext)s',
-          '--print', 'after_move:filepath',
-          url,
-        ],
-        workingDirectory: workDir.path);
+    final process = await Process.start(yt.path!, [
+      '--no-playlist',
+      '--newline',
+      '-f',
+      'ba/b',
+      '-o',
+      '%(title).80s [%(id)s].%(ext)s',
+      '--print',
+      'after_move:filepath',
+      url,
+    ], workingDirectory: workDir.path);
     _active.add(process);
     final sbErr = StringBuffer();
     String? lastPlainLine;
@@ -249,35 +259,45 @@ class MediaImportService {
         .transform(utf8.decoder)
         .transform(const LineSplitter())
         .listen((line) {
-      if (line.trim().isEmpty) return;
-      final pct = RegExp(r'(\d+(?:\.\d+)?)%').firstMatch(line);
-      if (pct != null && line.contains('[download]')) {
-        onProgress(double.parse(pct.group(1)!) / 100);
-        return;
-      }
-      if (!line.startsWith('[')) lastPlainLine = line.trim();
-    });
+          if (line.trim().isEmpty) return;
+          final pct = RegExp(r'(\d+(?:\.\d+)?)%').firstMatch(line);
+          if (pct != null && line.contains('[download]')) {
+            onProgress(double.parse(pct.group(1)!) / 100);
+            return;
+          }
+          if (!line.startsWith('[')) lastPlainLine = line.trim();
+        });
     process.stderr.transform(utf8.decoder).listen(sbErr.write);
     final code = await process.exitCode;
     _active.remove(process);
     _ensureAlive();
     if (code != 0 || lastPlainLine == null) {
-      throw MediaImportException(
-          'URL 媒体下载失败，站点可能不支持或网络异常', _tail(sbErr));
+      throw MediaImportException('URL 媒体下载失败，站点可能不支持或网络异常', _tail(sbErr));
     }
     return File(lastPlainLine!);
   }
 
   Future<File> _toWav(
-      File input, Directory workDir, void Function(double) onProgress) async {
+    File input,
+    Directory workDir,
+    void Function(double) onProgress,
+  ) async {
     final ff = await toolService.check(MediaToolKind.ffmpeg);
     if (!ff.ready || ff.path == null) {
       throw const MediaImportException('ffmpeg 未安装，请先在环境检查中安装');
     }
     final wavPath = '${workDir.path}/audio.wav';
     final args = [
-      '-y', '-i', input.path,
-      '-vn', '-ar', '16000', '-ac', '1', '-c:a', 'pcm_s16le',
+      '-y',
+      '-i',
+      input.path,
+      '-vn',
+      '-ar',
+      '16000',
+      '-ac',
+      '1',
+      '-c:a',
+      'pcm_s16le',
       wavPath,
     ];
     Process process;

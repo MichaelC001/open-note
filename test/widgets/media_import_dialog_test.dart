@@ -149,5 +149,19 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets('关闭向导后状态重置回 source 步，可重新填写', (tester) async {
+      final provider = makeProvider();
+      await pumpDialogWith(tester, provider);
+      await provider.startForFile(File('/tmp/demo.mp4'));
+      await tester.pumpAndSettle();
+      expect(provider.step, MediaImportStep.envCheck);
+
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      expect(provider.step, MediaImportStep.source);
+      expect(provider.pickedFile, isNull);
+      expect(provider.urlInput, isEmpty);
+    });
   });
 }

@@ -29,9 +29,9 @@ class MediaImportProvider extends ChangeNotifier {
     WhisperModelService? modelService,
     MediaDownloader? downloader,
     this.callAI,
-  })  : toolService = toolService ?? MediaToolService(),
-        modelService = modelService ?? WhisperModelService(),
-        downloader = downloader ?? MediaDownloader();
+  }) : toolService = toolService ?? MediaToolService(),
+       modelService = modelService ?? WhisperModelService(),
+       downloader = downloader ?? MediaDownloader();
 
   MediaImportStep step = MediaImportStep.source;
   ImportSourceKind sourceKind = ImportSourceKind.url;
@@ -134,7 +134,8 @@ class MediaImportProvider extends ChangeNotifier {
       const needBytes = 200 * 1024 * 1024;
       if (free != null && free < needBytes) {
         errorMessage = '磁盘空间不足';
-        errorDetail = '需要约 ${needBytes ~/ 1024 / 1024} MB，可用 '
+        errorDetail =
+            '需要约 ${needBytes ~/ 1024 / 1024} MB，可用 '
             '${free ~/ 1024 / 1024} MB';
         return;
       }
@@ -177,10 +178,13 @@ class MediaImportProvider extends ChangeNotifier {
             }
           },
         );
-        final extractDir = '$dir/_extract_${DateTime.now().millisecondsSinceEpoch}';
+        final extractDir =
+            '$dir/_extract_${DateTime.now().millisecondsSinceEpoch}';
         await downloader.extract(archive, extractDir);
-        final installed =
-            await toolService.installExtractedBinary(extractDir, kind);
+        final installed = await toolService.installExtractedBinary(
+          extractDir,
+          kind,
+        );
         _deleteDirQuiet(Directory(extractDir));
         if (archive.path != dest.path && await archive.exists()) {
           try {
@@ -219,7 +223,8 @@ class MediaImportProvider extends ChangeNotifier {
       final needBytes = info.downloadSizeBytes;
       if (free != null && free < needBytes) {
         errorMessage = '磁盘空间不足';
-        errorDetail = '需要约 ${needBytes ~/ 1024 / 1024} MB，可用 '
+        errorDetail =
+            '需要约 ${needBytes ~/ 1024 / 1024} MB，可用 '
             '${free ~/ 1024 / 1024} MB';
         return;
       }
@@ -317,9 +322,8 @@ class MediaImportProvider extends ChangeNotifier {
 
   Future<void> confirmAndStart({
     required Future<String?> Function(MediaImportResult result) saveNote,
-    Future<MediaImportResult> Function(
-            MediaImportService, MediaImportRequest)?
-        runOverride,
+    Future<MediaImportResult> Function(MediaImportService, MediaImportRequest)?
+    runOverride,
     bool waitCompletion = true,
   }) async {
     step = MediaImportStep.processing;
@@ -352,17 +356,24 @@ class MediaImportProvider extends ChangeNotifier {
       try {
         final r = runOverride != null
             ? await runOverride(service, request)
-            : await service.run(request, onProgress: (p, v) {
-                phase = p;
-                phaseProgress = v;
-                _notify();
-              });
+            : await service.run(
+                request,
+                onProgress: (p, v) {
+                  phase = p;
+                  phaseProgress = v;
+                  _notify();
+                },
+              );
         result = r;
         resultNoteId = await saveNote(r);
         step = MediaImportStep.done;
       } on MediaImportException catch (e) {
-        errorMessage = e.message;
-        errorDetail = e.detail;
+        if (e.message == MediaImportException.cancelledMessage) {
+          reset();
+        } else {
+          errorMessage = e.message;
+          errorDetail = e.detail;
+        }
       } catch (e) {
         errorMessage = '转换失败';
         errorDetail = e.toString();

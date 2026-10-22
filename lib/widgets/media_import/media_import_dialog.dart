@@ -56,38 +56,52 @@ class _MediaImportDialogState extends State<MediaImportDialog> {
   @override
   Widget build(BuildContext context) {
     final t = Translations.of(context);
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(children: [
-            Expanded(
-              child: Text(t.media_import_title,
-                  style: Theme.of(context).textTheme.titleLarge),
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          final p = context.read<MediaImportProvider>();
+          p.cancel();
+          p.reset();
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    t.media_import_title,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
             ),
-            IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ]),
-          const SizedBox(height: 12),
-          Flexible(
-            child: Consumer<MediaImportProvider>(
-              builder: (context, p, _) => switch (p.step) {
-                MediaImportStep.source => const SourceStep(),
-                MediaImportStep.envCheck => const EnvCheckStep(),
-                MediaImportStep.confirm =>
-                  ConfirmStep(saveNote: widget.onSaveNote),
-                MediaImportStep.processing => const ProcessingStep(),
-                MediaImportStep.done => DoneStep(
+            const SizedBox(height: 12),
+            Flexible(
+              child: Consumer<MediaImportProvider>(
+                builder: (context, p, _) => switch (p.step) {
+                  MediaImportStep.source => const SourceStep(),
+                  MediaImportStep.envCheck => const EnvCheckStep(),
+                  MediaImportStep.confirm => ConfirmStep(
+                    saveNote: widget.onSaveNote,
+                  ),
+                  MediaImportStep.processing => const ProcessingStep(),
+                  MediaImportStep.done => DoneStep(
                     onOpenNote: widget.onOpenNote,
                   ),
-              },
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
