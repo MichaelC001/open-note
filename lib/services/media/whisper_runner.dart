@@ -27,6 +27,7 @@ class WhisperRunner {
       '-oj',
       '-of', outPrefix,
       '-np',
+      '-pp',
     ];
     if (language != 'auto') {
       args.addAll(['-l', language]);
@@ -42,6 +43,16 @@ class WhisperRunner {
       latest = int.parse(m.group(1)!) * 3600 +
           int.parse(m.group(2)!) * 60 +
           int.parse(m.group(3)!);
+    }
+    return latest;
+  }
+
+  /// 从 `-pp` 进度行解析百分比（行如 "progress = 35%"），返回最后匹配的小数。
+  static double? parseProgressPercent(String chunk) {
+    double? latest;
+    final re = RegExp(r'progress\s*=\s*(\d+)%');
+    for (final m in re.allMatches(chunk)) {
+      latest = int.parse(m.group(1)!) / 100;
     }
     return latest;
   }
@@ -67,11 +78,17 @@ class WhisperRunner {
           language: language),
     );
     onStarted?.call(process);
+    // 段落文本行走 stdout，不排水会填满 64KB 管道导致 whisper 写阻塞死锁
+    process.stdout.listen((_) {}, onError: (_) {});
     final sbErr = StringBuffer();
     process.stderr.transform(utf8.decoder).listen((chunk) {
       sbErr.write(chunk);
+      if (totalDurationMs == null || totalDurationMs <= 0) return;
       final sec = parseProgressSeconds(chunk);
-      if (sec != null && totalDurationMs != null && totalDurationMs > 0) {
+      final pct = parseProgressPercent(chunk);
+      if (pct != null) {
+        onProgress?.call(pct.clamp(0.0, 1.0));
+      } else if (sec != null) {
         onProgress?.call((sec * 1000 / totalDurationMs).clamp(0.0, 1.0));
       }
     });

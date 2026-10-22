@@ -14,14 +14,14 @@ void main() {
     expect(
         WhisperRunner.buildArgs(
             modelPath: 'm.bin', wavPath: 'a.wav', outPrefix: 'a'),
-        ['-m', 'm.bin', '-f', 'a.wav', '-oj', '-of', 'a', '-np']);
+        ['-m', 'm.bin', '-f', 'a.wav', '-oj', '-of', 'a', '-np', '-pp']);
     expect(
         WhisperRunner.buildArgs(
             modelPath: 'm.bin',
             wavPath: 'a.wav',
             outPrefix: 'a',
             language: 'zh')
-            .sublist(8),
+            .sublist(9),
         ['-l', 'zh']);
   });
 
@@ -29,5 +29,14 @@ void main() {
     const chunk = '[00:00:00 --> 00:00:02] hi\n[00:01:05 --> 00:01:10] yo\n';
     expect(WhisperRunner.parseProgressSeconds(chunk), 65);
     expect(WhisperRunner.parseProgressSeconds('nothing'), isNull);
+  });
+
+  test('parseProgressPercent 取最后一个百分比', () {
+    expect(WhisperRunner.parseProgressPercent('[progress = 35%]'), 0.35);
+    expect(
+        WhisperRunner.parseProgressPercent(
+            'progress = 30%\nprogress = 35%\n'),
+        0.35);
+    expect(WhisperRunner.parseProgressPercent('nothing here'), isNull);
   });
 }
