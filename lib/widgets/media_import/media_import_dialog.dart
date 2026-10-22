@@ -58,11 +58,19 @@ class _MediaImportDialogState extends State<MediaImportDialog> {
     final t = Translations.of(context);
     return PopScope(
       onPopInvokedWithResult: (didPop, _) {
-        if (didPop) {
-          final p = context.read<MediaImportProvider>();
-          p.cancel();
-          p.reset();
+        if (!didPop) return;
+        final p = context.read<MediaImportProvider>();
+        final background = p.toolDownloading.values.any((v) => v) ||
+            p.toolInstalling.values.any((v) => v) ||
+            p.modelDownloading;
+        if (background) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(t.media_env_background)),
+          );
+          return;
         }
+        p.cancel();
+        p.reset();
       },
       child: Padding(
         padding: const EdgeInsets.all(20),

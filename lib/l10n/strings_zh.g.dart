@@ -3027,6 +3027,9 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 	/// zh: '一键安装'
 	String get media_env_autoInstall => '一键安装';
 
+	/// zh: '下载已在后台进行，可在 设置→视频转笔记 查看进度'
+	String get media_env_background => '下载已在后台进行，可在 设置→视频转笔记 查看进度';
+
 	/// zh: '卸载'
 	String get media_env_uninstall => '卸载';
 

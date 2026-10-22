@@ -1,10 +1,13 @@
 // test/widgets/media_import_dialog_test.dart
+import 'dart:async';
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_note/l10n/strings.g.dart';
 import 'package:open_note/providers/media_import_provider.dart';
+import 'package:open_note/services/media/media_downloader.dart';
 import 'package:open_note/services/media/media_tool_service.dart';
 import 'package:open_note/services/media/whisper_model_service.dart';
 import 'package:open_note/widgets/media_import/media_import_dialog.dart';
@@ -13,6 +16,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class _CountingToolService extends MediaToolService {
   int checkCount = 0;
+  bool ytDlpMissing = false;
 
   _CountingToolService(Directory dir)
       : super(resolveBaseDir: () async => dir.path);
@@ -20,7 +24,20 @@ class _CountingToolService extends MediaToolService {
   @override
   Future<MediaToolStatus> check(MediaToolKind kind) async {
     checkCount++;
+    if (ytDlpMissing && kind == MediaToolKind.ytDlp) {
+      return const MediaToolStatus.missing(MediaToolKind.ytDlp);
+    }
+    if (ytDlpMissing) {
+      return MediaToolStatus(kind: kind, ready: true, version: 'fake');
+    }
     return MediaToolStatus.missing(kind);
+  }
+
+  // 基类实现含真实文件 IO（exists/create），FakeAsync 下无法完成，改纯计算
+  @override
+  Future<String> toolDir(MediaToolKind kind) async {
+    final base = await resolveBaseDir();
+    return '$base/tools/${kind.name}';
   }
 }
 
@@ -29,6 +46,33 @@ class _AllDownloadedFastService extends _FastModelService {
 
   @override
   Future<File?> localModelFile(WhisperModelTier tier) async => File('m.bin');
+}
+
+class _GatedDownloader extends MediaDownloader {
+  final Completer<void> started = Completer<void>();
+  final Completer<void> release = Completer<void>();
+
+  _GatedDownloader();
+
+  // testWidgets 的 FakeAsync 内真实 df 子进程事件无法送达，覆写避免死等
+  @override
+  Future<int?> freeDiskBytes(String path) async => 10 << 30;
+
+  @override
+  Future<File> download(
+    String directUrl, {
+    required File destFile,
+    MediaDownloadSourceMode mode = MediaDownloadSourceMode.auto,
+    void Function(int received, int total)? onProgress,
+    CancelToken? cancelToken,
+    String? expectedSha256,
+  }) async {
+    onProgress?.call(0, 1000);
+    onProgress?.call(500, 1000);
+    started.complete();
+    await release.future;
+    return destFile;
+  }
 }
 
 class _FastModelService extends WhisperModelService {
@@ -219,6 +263,61 @@ void main() {
       expect(provider.step, MediaImportStep.source);
       expect(provider.pickedFile, isNull);
       expect(provider.urlInput, isEmpty);
+    });
+
+    testWidgets('下载中关闭向导：提示后台继续且不取消下载', (tester) async {
+      tools.ytDlpMissing = true;
+      final gate = _GatedDownloader();
+      final provider = MediaImportProvider(
+        toolService: tools,
+        modelService: models,
+        downloader: gate,
+      );
+      // 走生产同款 showDialog 流程：关闭的是对话框路由，宿主 Scaffold 保留，
+      // ScaffoldMessenger 的 SnackBar 才能持续展示
+      await tester.pumpWidget(
+        TranslationProvider(
+          child: ChangeNotifierProvider<MediaImportProvider>.value(
+            value: provider,
+            child: MaterialApp(
+              home: Scaffold(
+                body: Builder(
+                  builder: (context) => Center(
+                    child: TextButton(
+                      onPressed: () => MediaImportDialog.show(context),
+                      child: const Text('open'),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      await provider.startForUrl('https://example.com/v.mp4');
+      await tester.pumpAndSettle();
+      await provider.checkEnvironment();
+      await tester.pumpAndSettle();
+      // 仅 yt-dlp 未就绪 → 行内出现下载按钮
+      await tester.tap(find.text('下载便携版').first);
+      // FakeAsync 下先 pump 排空微任务，下载链路才能推进到 started 门
+      await tester.pump();
+      await gate.started.future;
+      await tester.pump();
+      // 关闭向导
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      expect(find.byType(MediaImportDialog), findsNothing);
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(provider.toolDownloading[MediaToolKind.ytDlp] ?? false, isTrue);
+      gate.release.complete();
+      await tester.pump();
+      // 冲洗 SnackBar 自动消失 Timer（4s）及其退场动画，避免 pending timer
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
     });
   });
 }
