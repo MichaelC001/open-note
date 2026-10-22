@@ -15,6 +15,7 @@ import '../providers/tags_provider.dart';
 import '../providers/background_summary_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/knowledge_base_provider.dart';
+import '../providers/media_import_provider.dart';
 import '../providers/memory_settings_provider.dart';
 import '../providers/update_provider.dart';
 import '../providers/language_provider.dart';
@@ -62,6 +63,7 @@ class _SplashScreenState extends State<SplashScreen> {
   BackgroundSummaryProvider? _backgroundSummaryProvider;
   CategoryProvider? _categoryProvider;
   KnowledgeBaseProvider? _knowledgeBaseProvider;
+  MediaImportProvider? _mediaImportProvider;
   MemorySettingsProvider? _memoryProvider;
   UpdateProvider? _updateProvider;
   LanguageProvider? _languageProvider;
@@ -139,7 +141,10 @@ class _SplashScreenState extends State<SplashScreen> {
         kbEnabled: kbEnabled,
         notesProvider: _notesProvider,
       ));
-      
+
+      await _yieldFrame();
+      _mediaImportProvider = MediaImportProvider();
+
       await _yieldFrame();
       _backgroundSummaryProvider = BackgroundSummaryProvider();
       _backgroundSummaryProvider!.setProviders(
@@ -230,6 +235,7 @@ class _SplashScreenState extends State<SplashScreen> {
           ChangeNotifierProvider.value(value: _memoryProvider!),
           ChangeNotifierProvider.value(value: _updateProvider!),
           ChangeNotifierProvider.value(value: _languageProvider!),
+          ChangeNotifierProvider.value(value: _mediaImportProvider!),
         ],
         child: const _HomeApp(),
       );
