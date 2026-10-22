@@ -7,6 +7,14 @@ import 'process_runner.dart';
 
 enum MediaToolKind { ffmpeg, ytDlp, whisperCli }
 
+/// 一键自动安装的可执行计划。
+class InstallerPlan {
+  final String executable;
+  final List<String> args;
+
+  const InstallerPlan(this.executable, this.args);
+}
+
 enum MediaToolSource { appManaged, systemPath }
 
 class MediaToolStatus {
@@ -121,6 +129,38 @@ class MediaToolService {
       return null;
     }
   }
+
+  /// 一键自动安装计划：whisperCli 在 macOS 用 brew、Windows 用 winget；
+  /// Linux 因 apt 需要交互提权不支持，返回 null 时 UI 回退为安装指引。
+  static InstallerPlan? autoInstallPlan(
+    MediaToolKind kind, {
+    String? brewPath,
+    required bool isMac,
+    required bool isWin,
+  }) {
+    if (kind != MediaToolKind.whisperCli) return null;
+    if (isMac) {
+      if (brewPath == null || brewPath.isEmpty) return null;
+      return InstallerPlan(brewPath, ['install', '-q', 'whisper-cpp']);
+    }
+    if (isWin) {
+      return const InstallerPlan('winget', [
+        'install',
+        '--id',
+        'ggml.whisper-cpp',
+        '-e',
+        '--accept-source-agreements',
+        '--accept-package-agreements',
+        '--disable-interactivity',
+      ]);
+    }
+    return null;
+  }
+
+  /// 常见 brew 安装路径（GUI 应用无 shell PATH，需按绝对路径探测）。
+  static List<String> brewCandidatePaths() => Platform.isMacOS
+      ? ['/opt/homebrew/bin/brew', '/usr/local/bin/brew']
+      : const [];
 
   static String? parseFfmpegVersion(String stdout) =>
       RegExp(r'ffmpeg version (\S+)').firstMatch(stdout)?.group(1);

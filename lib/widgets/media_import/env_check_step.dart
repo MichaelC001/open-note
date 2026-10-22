@@ -71,7 +71,13 @@ class EnvCheckStep extends StatelessWidget {
               status: p.toolStatuses[kind],
               downloading: p.toolDownloading[kind] ?? false,
               progress: p.toolProgress[kind] ?? 0,
+              autoInstalling: p.toolInstalling[kind] ?? false,
               guide: _installGuides[kind]![platformKey]!,
+              onAutoInstall: _ToolTile.canAutoInstall(kind, platformKey)
+                  ? () => context
+                      .read<MediaImportProvider>()
+                      .autoInstallTool(kind)
+                  : null,
             ),
           const Divider(height: 24),
           const _ModelSection(),
@@ -95,15 +101,23 @@ class _ToolTile extends StatelessWidget {
   final MediaToolStatus? status;
   final bool downloading;
   final double progress;
+  final bool autoInstalling;
   final String guide;
+  final VoidCallback? onAutoInstall;
 
   const _ToolTile({
     required this.kind,
     required this.status,
     required this.downloading,
     required this.progress,
+    required this.autoInstalling,
     required this.guide,
+    this.onAutoInstall,
   });
+
+  static bool canAutoInstall(MediaToolKind kind, String platformKey) =>
+      kind == MediaToolKind.whisperCli &&
+      (platformKey == 'macos' || platformKey == 'windows');
 
   @override
   Widget build(BuildContext context) {
@@ -131,6 +145,19 @@ class _ToolTile extends StatelessWidget {
       ),
       trailing: ready
           ? null
+          : autoInstalling
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: 8),
+                Text(t.media_env_installing),
+              ],
+            )
           : downloading
           ? SizedBox(
               width: 120,
@@ -139,6 +166,11 @@ class _ToolTile extends StatelessWidget {
           : Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (onAutoInstall != null)
+                  TextButton(
+                    onPressed: onAutoInstall,
+                    child: Text(t.media_env_autoInstall),
+                  ),
                 if (!hideDownload)
                   TextButton(
                     onPressed: () =>

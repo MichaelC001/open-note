@@ -4,18 +4,23 @@ import 'package:open_note/providers/media_import_provider.dart';
 import 'package:open_note/services/media/media_import_service.dart';
 import 'package:open_note/services/media/media_tool_service.dart';
 import 'package:open_note/services/media/whisper_model_service.dart';
+import 'package:open_note/services/media/process_runner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _ReadyToolService extends MediaToolService {
+  int checkCount = 0;
   _ReadyToolService(Future<String> Function() base)
       : super(resolveBaseDir: base);
   @override
-  Future<MediaToolStatus> check(MediaToolKind kind) async => MediaToolStatus(
-      kind: kind,
-      ready: true,
-      path: 'fake',
-      version: '1',
-      source: MediaToolSource.appManaged);
+  Future<MediaToolStatus> check(MediaToolKind kind) async {
+    checkCount++;
+    return MediaToolStatus(
+        kind: kind,
+        ready: true,
+        path: 'fake',
+        version: '1',
+        source: MediaToolSource.appManaged);
+  }
 }
 
 class _AllModelsService extends WhisperModelService {
@@ -106,5 +111,60 @@ void main() {
     p.cancel();
     await Future.delayed(const Duration(milliseconds: 50));
     expect(p.step, isNot(MediaImportStep.done));
+  });
+
+  group('autoInstallTool（一键自动安装）', () {
+    test('成功后重新检测、清除安装中状态、无错误', () async {
+      final tools = _ReadyToolService(() async => tmp.path);
+      final p = MediaImportProvider(
+        toolService: tools,
+        modelService: _AllModelsService(() async => tmp.path),
+        installerRunner: (exe, args) async =>
+            const ProcessRunResult(0, 'Pouring whisper-cpp', ''),
+        brewPathResolver: () async => '/fake/brew',
+      );
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+      final before = tools.checkCount;
+
+      await p.autoInstallTool(MediaToolKind.whisperCli);
+
+      expect(tools.checkCount, greaterThan(before));
+      expect(p.toolInstalling[MediaToolKind.whisperCli] ?? false, isFalse);
+      expect(p.errorMessage, isNull);
+      expect(p.toolStatuses[MediaToolKind.whisperCli]!.ready, isTrue);
+    });
+
+    test('安装进程非零退出时写入 errorMessage/errorDetail', () async {
+      final p = MediaImportProvider(
+        toolService: _ReadyToolService(() async => tmp.path),
+        modelService: _AllModelsService(() async => tmp.path),
+        installerRunner: (exe, args) async =>
+            const ProcessRunResult(1, '', 'Error: formula unavailable'),
+        brewPathResolver: () async => '/fake/brew',
+      );
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+
+      await p.autoInstallTool(MediaToolKind.whisperCli);
+
+      expect(p.errorMessage, '自动安装失败');
+      expect(p.errorDetail, contains('formula unavailable'));
+      expect(p.toolInstalling[MediaToolKind.whisperCli] ?? false, isFalse);
+    });
+
+    test('brew 缺失（plan 为 null）时提示并回退指引', () async {
+      final p = MediaImportProvider(
+        toolService: _ReadyToolService(() async => tmp.path),
+        modelService: _AllModelsService(() async => tmp.path),
+        installerRunner: (exe, args) async =>
+            const ProcessRunResult(0, '', ''),
+        brewPathResolver: () async => null,
+      );
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+
+      await p.autoInstallTool(MediaToolKind.whisperCli);
+
+      expect(p.errorMessage, '无法自动安装');
+      expect(p.errorDetail, contains('Homebrew'));
+    });
   });
 }

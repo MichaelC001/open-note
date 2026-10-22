@@ -150,6 +150,16 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('whisperCpp 未安装时提供一键安装按钮（macOS/Windows）',
+        (tester) async {
+      final provider = makeProvider();
+      await pumpDialogWith(tester, provider);
+      await provider.startForFile(File('/tmp/demo.mp4'));
+      await tester.pumpAndSettle();
+      // 测试默认 TargetPlatform 为 macOS
+      expect(find.text('一键安装'), findsOneWidget);
+    });
+
     testWidgets('关闭向导后状态重置回 source 步，可重新填写', (tester) async {
       final provider = makeProvider();
       await pumpDialogWith(tester, provider);

@@ -1,5 +1,6 @@
 // lib/providers/media_import_provider.dart
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 
@@ -10,6 +11,7 @@ import '../services/media/media_downloader.dart';
 import '../services/media/media_import_service.dart';
 import '../services/media/media_import_settings.dart';
 import '../services/media/media_tool_service.dart';
+import '../services/media/process_runner.dart';
 import '../services/media/transcript_formatter.dart';
 import '../services/media/whisper_model_service.dart';
 
@@ -23,15 +25,21 @@ class MediaImportProvider extends ChangeNotifier {
   final MediaDownloader downloader;
   final MediaImportSettings settings = MediaImportSettings();
   final Future<String> Function(String prompt)? callAI;
+  final Future<ProcessRunResult> Function(String, List<String>) installerRunner;
+  final Future<String?> Function() brewPathResolver;
 
   MediaImportProvider({
     MediaToolService? toolService,
     WhisperModelService? modelService,
     MediaDownloader? downloader,
     this.callAI,
+    Future<ProcessRunResult> Function(String, List<String>)? installerRunner,
+    Future<String?> Function()? brewPathResolver,
   }) : toolService = toolService ?? MediaToolService(),
        modelService = modelService ?? WhisperModelService(),
-       downloader = downloader ?? MediaDownloader();
+       downloader = downloader ?? MediaDownloader(),
+       installerRunner = installerRunner ?? _defaultInstallerRunner,
+       brewPathResolver = brewPathResolver ?? _defaultBrewPathResolver;
 
   MediaImportStep step = MediaImportStep.source;
   ImportSourceKind sourceKind = ImportSourceKind.url;
@@ -40,6 +48,7 @@ class MediaImportProvider extends ChangeNotifier {
 
   final Map<MediaToolKind, MediaToolStatus> toolStatuses = {};
   final Map<MediaToolKind, bool> toolDownloading = {};
+  final Map<MediaToolKind, bool> toolInstalling = {};
   final Map<MediaToolKind, double> toolProgress = {};
 
   WhisperModelTier recommendedTier = WhisperModelTier.medium;
@@ -58,6 +67,7 @@ class MediaImportProvider extends ChangeNotifier {
   String? resultNoteId;
 
   CancelToken? _downloadCancel;
+  Process? _activeInstaller;
   MediaImportService? _activeService;
   bool _busy = false;
 
@@ -142,7 +152,8 @@ class MediaImportProvider extends ChangeNotifier {
       _downloadCancel = CancelToken();
       final binName = toolService.binaryName(kind);
       final dest = File('$dir/$binName');
-      final isSingleFile = kind == MediaToolKind.ytDlp ||
+      final isSingleFile =
+          kind == MediaToolKind.ytDlp ||
           (kind == MediaToolKind.ffmpeg && !Platform.isWindows);
       if (isSingleFile) {
         await downloader.download(
@@ -210,6 +221,70 @@ class MediaImportProvider extends ChangeNotifier {
       _downloadCancel = null;
       _notify();
     }
+  }
+
+  /// 一键自动安装（macOS=brew / Windows=winget，仅 whisperCli 支持）。
+  Future<void> autoInstallTool(MediaToolKind kind) async {
+    final brewPath = Platform.isMacOS ? await brewPathResolver() : null;
+    final plan = MediaToolService.autoInstallPlan(
+      kind,
+      brewPath: brewPath,
+      isMac: Platform.isMacOS,
+      isWin: Platform.isWindows,
+    );
+    if (plan == null) {
+      errorMessage = '无法自动安装';
+      errorDetail = Platform.isMacOS
+          ? '未检测到 Homebrew，请按指引手动安装（终端执行 brew install whisper-cpp）'
+          : '当前平台不支持自动安装，请按指引手动安装';
+      _notify();
+      return;
+    }
+    toolInstalling[kind] = true;
+    errorMessage = null;
+    errorDetail = null;
+    _notify();
+    try {
+      final r = await installerRunner(plan.executable, plan.args);
+      if (r.exitCode != 0) {
+        errorMessage = '自动安装失败';
+        errorDetail = (r.stderr.trim().isNotEmpty ? r.stderr : r.stdout).trim();
+        return;
+      }
+      toolStatuses[kind] = await toolService.check(kind);
+    } catch (e) {
+      errorMessage = '自动安装失败';
+      errorDetail = e.toString();
+    } finally {
+      toolInstalling[kind] = false;
+      _activeInstaller = null;
+      _notify();
+    }
+  }
+
+  static Future<ProcessRunResult> _defaultInstallerRunner(
+    String executable,
+    List<String> args,
+  ) async {
+    final process = await Process.start(executable, args);
+    final sbOut = StringBuffer();
+    final sbErr = StringBuffer();
+    process.stdout.transform(utf8.decoder).listen(sbOut.write);
+    process.stderr.transform(utf8.decoder).listen(sbErr.write);
+    final code = await process.exitCode;
+    return ProcessRunResult(code, _tailOf(sbOut), _tailOf(sbErr));
+  }
+
+  static String _tailOf(StringBuffer sb) {
+    final s = sb.toString();
+    return s.length > 2000 ? s.substring(s.length - 2000) : s;
+  }
+
+  static Future<String?> _defaultBrewPathResolver() async {
+    for (final path in MediaToolService.brewCandidatePaths()) {
+      if (File(path).existsSync()) return path;
+    }
+    return null;
   }
 
   Future<void> downloadSelectedModel() async {
@@ -395,6 +470,7 @@ class MediaImportProvider extends ChangeNotifier {
   void cancel() {
     _downloadCancel?.cancel();
     _activeService?.cancel();
+    _activeInstaller?.kill();
   }
 
   void reset() {

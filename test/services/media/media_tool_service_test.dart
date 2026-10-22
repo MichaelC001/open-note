@@ -10,8 +10,10 @@ const ProcessRunResult fail = ProcessRunResult(1, '', '');
 void main() {
   group('版本解析', () {
     test('parseFfmpegVersion', () {
-      expect(MediaToolService.parseFfmpegVersion('ffmpeg version 7.1-x\n...'),
-          '7.1-x');
+      expect(
+        MediaToolService.parseFfmpegVersion('ffmpeg version 7.1-x\n...'),
+        '7.1-x',
+      );
       expect(MediaToolService.parseFfmpegVersion('nonsense'), isNull);
     });
     test('parseYtDlpVersion', () {
@@ -28,8 +30,9 @@ void main() {
     test('应用自管目录存在且版本可用 -> appManaged', () async {
       final ffmpegDir = Directory('${tmp.path}/tools/ffmpeg');
       ffmpegDir.createSync(recursive: true);
-      final bin =
-          File('${ffmpegDir.path}/ffmpeg${Platform.isWindows ? '.exe' : ''}');
+      final bin = File(
+        '${ffmpegDir.path}/ffmpeg${Platform.isWindows ? '.exe' : ''}',
+      );
       bin.writeAsStringSync('');
       if (!Platform.isWindows) {
         await Process.run('chmod', ['+x', bin.path]);
@@ -80,50 +83,117 @@ void main() {
     test('递归找到二进制并安装到 toolDir', () async {
       final nested = Directory('${tmp.path}/extract/ffmpeg-7.1/bin');
       nested.createSync(recursive: true);
-      final found =
-          File('${nested.path}/ffmpeg${Platform.isWindows ? '.exe' : ''}');
+      final found = File(
+        '${nested.path}/ffmpeg${Platform.isWindows ? '.exe' : ''}',
+      );
       found.writeAsStringSync('#!/bin/sh\n');
       final svc = MediaToolService(resolveBaseDir: () async => tmp.path);
-      final installed =
-          await svc.installExtractedBinary('${tmp.path}/extract', MediaToolKind.ffmpeg);
+      final installed = await svc.installExtractedBinary(
+        '${tmp.path}/extract',
+        MediaToolKind.ffmpeg,
+      );
       expect(installed, isNotNull);
       expect(
-          File(installed!).path.endsWith(
-              'tools/ffmpeg/ffmpeg${Platform.isWindows ? '.exe' : ''}'),
-          isTrue);
+        File(installed!).path.endsWith(
+          'tools/ffmpeg/ffmpeg${Platform.isWindows ? '.exe' : ''}',
+        ),
+        isTrue,
+      );
     });
 
     test('找不到二进制返回 null', () async {
       Directory('${tmp.path}/extract').createSync(recursive: true);
       final svc = MediaToolService(resolveBaseDir: () async => tmp.path);
       expect(
-          await svc.installExtractedBinary(
-              '${tmp.path}/extract', MediaToolKind.whisperCli),
-          isNull);
+        await svc.installExtractedBinary(
+          '${tmp.path}/extract',
+          MediaToolKind.whisperCli,
+        ),
+        isNull,
+      );
     });
 
     test('whisper 安装时把同目录动态库一并平铺搬到 toolDir', () async {
-      final binDir = Directory('${tmp.path}/extract/build/bin');
-      binDir.createSync(recursive: true);
-      final exe = Platform.isWindows ? '.exe' : '';
-      File('${binDir.path}/whisper-cli$exe').writeAsStringSync('#!/bin/sh\n');
-      final lib = Platform.isWindows
-          ? File('${binDir.path}/whisper.dll')
-          : File('${binDir.path}/libwhisper.so');
-      lib.writeAsStringSync('libbytes');
-      // 干扰项：非库文件不应被搬动
-      File('${binDir.path}/readme.txt').writeAsStringSync('doc');
-
+      final nested = Directory('${tmp.path}/extract2/build/bin');
+      nested.createSync(recursive: true);
+      final exeName = Platform.isWindows ? 'whisper-cli.exe' : 'whisper-cli';
+      final libExt = Platform.isWindows ? '.dll' : '.so';
+      File('${nested.path}/$exeName').writeAsStringSync('x');
+      final lib = File('${nested.path}/whisper$libExt')
+        ..writeAsStringSync('lib');
+      File('${nested.path}/readme.txt').writeAsStringSync('doc');
       final svc = MediaToolService(resolveBaseDir: () async => tmp.path);
       final installed = await svc.installExtractedBinary(
-          '${tmp.path}/extract', MediaToolKind.whisperCli);
+          '${tmp.path}/extract2', MediaToolKind.whisperCli);
       expect(installed, isNotNull);
       final toolDirPath = await svc.toolDir(MediaToolKind.whisperCli);
-      expect(
-          File('$toolDirPath/whisper-cli$exe').existsSync(), isTrue);
+      expect(File('$toolDirPath/$exeName').existsSync(), isTrue);
       final libName = lib.uri.pathSegments.last;
       expect(File('$toolDirPath/$libName').existsSync(), isTrue);
       expect(File('$toolDirPath/readme.txt').existsSync(), isFalse);
+    });
+  });
+
+  group('autoInstallPlan（一键安装命令构建）', () {
+    test('macOS + brew 路径 -> brew install whisper-cpp', () {
+      final plan = MediaToolService.autoInstallPlan(
+        MediaToolKind.whisperCli,
+        brewPath: '/opt/homebrew/bin/brew',
+        isMac: true,
+        isWin: false,
+      );
+      expect(plan, isNotNull);
+      expect(plan!.executable, '/opt/homebrew/bin/brew');
+      expect(plan.args, ['install', '-q', 'whisper-cpp']);
+    });
+
+    test('macOS 但未找到 brew -> null（回退指引）', () {
+      expect(
+        MediaToolService.autoInstallPlan(
+          MediaToolKind.whisperCli,
+          brewPath: null,
+          isMac: true,
+          isWin: false,
+        ),
+        isNull,
+      );
+    });
+
+    test('Windows -> winget 静默安装 ggml.whisper-cpp', () {
+      final plan = MediaToolService.autoInstallPlan(
+        MediaToolKind.whisperCli,
+        brewPath: null,
+        isMac: false,
+        isWin: true,
+      );
+      expect(plan, isNotNull);
+      expect(plan!.executable, 'winget');
+      expect(plan.args.join(' '), contains('ggml.whisper-cpp'));
+      expect(plan.args.join(' '), contains('--disable-interactivity'));
+    });
+
+    test('Linux 不支持自动安装 -> null（保留指引）', () {
+      expect(
+        MediaToolService.autoInstallPlan(
+          MediaToolKind.whisperCli,
+          brewPath: null,
+          isMac: false,
+          isWin: false,
+        ),
+        isNull,
+      );
+    });
+
+    test('非 whisperCli 工具不提供自动安装 -> null', () {
+      expect(
+        MediaToolService.autoInstallPlan(
+          MediaToolKind.ffmpeg,
+          brewPath: '/opt/homebrew/bin/brew',
+          isMac: true,
+          isWin: false,
+        ),
+        isNull,
+      );
     });
   });
 }

@@ -3021,6 +3021,12 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 	/// zh: '自动推荐'
 	String get media_settings_defaultModelAuto => '自动推荐';
 
+	/// zh: '一键安装'
+	String get media_env_autoInstall => '一键安装';
+
+	/// zh: '安装中…'
+	String get media_env_installing => '安装中…';
+
 	/// zh: '重新检测'
 	String get media_env_recheck => '重新检测';
 
