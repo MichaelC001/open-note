@@ -1791,5 +1791,6 @@ class TranslationsZhTw extends Translations with BaseTranslations<AppLocale, Tra
 	@override String get media_settings_sourceMirror => '鏡像優先';
 	@override String get media_settings_defaultModel => '預設辨識模型';
 	@override String get media_settings_defaultModelAuto => '自動推薦';
+	@override String get media_env_recheck => '重新偵測';
 	@override String get media_settings_deleteSource => '完成後刪除下載的原始媒體';
 }

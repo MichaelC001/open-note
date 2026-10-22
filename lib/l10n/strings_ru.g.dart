@@ -1791,5 +1791,6 @@ class TranslationsRu extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get media_settings_sourceMirror => 'Сначала зеркало';
 	@override String get media_settings_defaultModel => 'Модель по умолчанию';
 	@override String get media_settings_defaultModelAuto => 'Автоподбор';
+	@override String get media_env_recheck => 'Проверить снова';
 	@override String get media_settings_deleteSource => 'Удалять скачанное медиа после завершения';
 }

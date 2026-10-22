@@ -1797,5 +1797,6 @@ class TranslationsEn extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get media_settings_sourceMirror => 'Mirror first';
 	@override String get media_settings_defaultModel => 'Default model';
 	@override String get media_settings_defaultModelAuto => 'Auto recommend';
+	@override String get media_env_recheck => 'Re-check';
 	@override String get media_settings_deleteSource => 'Delete downloaded media after completion';
 }

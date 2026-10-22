@@ -11,7 +11,7 @@ import 'env_check_step.dart';
 import 'processing_step.dart';
 import 'source_step.dart';
 
-class MediaImportDialog extends StatelessWidget {
+class MediaImportDialog extends StatefulWidget {
   final void Function(String noteId)? onOpenNote;
   final Future<String?> Function(MediaImportResult result)? onSaveNote;
 
@@ -34,6 +34,23 @@ class MediaImportDialog extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  @override
+  State<MediaImportDialog> createState() => _MediaImportDialogState();
+}
+
+class _MediaImportDialogState extends State<MediaImportDialog> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final p = context.read<MediaImportProvider>();
+      if (p.step == MediaImportStep.envCheck) {
+        p.checkEnvironment();
+      }
+    });
   }
 
   @override
@@ -62,9 +79,11 @@ class MediaImportDialog extends StatelessWidget {
                 MediaImportStep.source => const SourceStep(),
                 MediaImportStep.envCheck => const EnvCheckStep(),
                 MediaImportStep.confirm =>
-                  ConfirmStep(saveNote: onSaveNote),
+                  ConfirmStep(saveNote: widget.onSaveNote),
                 MediaImportStep.processing => const ProcessingStep(),
-                MediaImportStep.done => DoneStep(onOpenNote: onOpenNote),
+                MediaImportStep.done => DoneStep(
+                    onOpenNote: widget.onOpenNote,
+                  ),
               },
             ),
           ),

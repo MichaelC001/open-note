@@ -3021,6 +3021,9 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 	/// zh: '自动推荐'
 	String get media_settings_defaultModelAuto => '自动推荐';
 
+	/// zh: '重新检测'
+	String get media_env_recheck => '重新检测';
+
 	/// zh: '完成后删除下载的源媒体'
 	String get media_settings_deleteSource => '完成后删除下载的源媒体';
 }

@@ -42,6 +42,27 @@ class EnvCheckStep extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            IconButton(
+              icon: p.busy
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child:
+                          CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh),
+              tooltip: t.media_env_recheck,
+              onPressed: p.busy
+                  ? null
+                  : () => context
+                      .read<MediaImportProvider>()
+                      .checkEnvironment(),
+            ),
+          ],
+        ),
         if (p.errorMessage != null)
           _ErrorBanner(message: p.errorMessage!, detail: p.errorDetail),
         for (final kind in MediaToolKind.values.where(p.isToolRequired))
