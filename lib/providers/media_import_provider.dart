@@ -168,12 +168,13 @@ class MediaImportProvider extends ChangeNotifier {
     }
   }
 
-  /// 静默定时检查工具新版本（默认延迟 15s；到点时若操作进行中则顺延 60s 重试，
+  /// 静默定时检查工具新版本（默认延迟 15s；到点时若操作进行中或环境尚未检测
+  /// （toolStatuses 为空，如 splash 只调度未进入媒体 UI）则顺延 60s 重试，
   /// 避免会话内永不检查——24h 节流由 checkToolUpdates 内部兜底，重试零成本）。
   void scheduleUpdateCheck({Duration delay = const Duration(seconds: 15)}) {
     _updateCheckTimer?.cancel();
     _updateCheckTimer = Timer(delay, () {
-      if (operationInProgress) {
+      if (operationInProgress || toolStatuses.isEmpty) {
         scheduleUpdateCheck(delay: const Duration(seconds: 60));
         return;
       }
@@ -189,6 +190,9 @@ class MediaImportProvider extends ChangeNotifier {
           clock().difference(last) < const Duration(hours: 24)) {
         return;
       }
+      // 本轮至少实际 fetch 过一个 kind 才写 24h 节流时间戳：
+      // 全部被跳过（无状态/非 appManaged/操作占用）时空转不烧节流预算
+      var fetchedKinds = 0;
       for (final kind in MediaToolKind.values) {
         if ((toolDownloading[kind] ?? false) ||
             (toolInstalling[kind] ?? false) ||
@@ -205,6 +209,7 @@ class MediaImportProvider extends ChangeNotifier {
           updateChecking[kind] = true;
           _notify();
           final latest = await updateService.fetchLatestVersion(kind);
+          fetchedKinds++; // 网络已探测（返回 null 也算），才允许写节流时间戳
           if (latest != null) {
             final stored = kind == MediaToolKind.whisperCli
                 ? await settings.whisperCliSourceTag()
@@ -225,7 +230,9 @@ class MediaImportProvider extends ChangeNotifier {
           _notify();
         }
       }
-      await settings.setLastUpdateCheckAt(clock());
+      if (fetchedKinds > 0) {
+        await settings.setLastUpdateCheckAt(clock());
+      }
     } catch (_) {
       // 更新检查绝不影响主流程
     }
@@ -238,6 +245,14 @@ class MediaImportProvider extends ChangeNotifier {
   }
 
   Future<void> downloadTool(MediaToolKind kind) async {
+    // 操作占用守卫：下载/安装/finishing 收尾/卸载期间重复触发直接忽略
+    //（防 finishing 窗口内重复点击「更新」造成二次下载/状态互踩）
+    if ((toolDownloading[kind] ?? false) ||
+        (toolInstalling[kind] ?? false) ||
+        (toolFinishing[kind] ?? false) ||
+        (toolUninstalling[kind] ?? false)) {
+      return;
+    }
     updateAvailableVersion[kind] = null;
     toolDownloading[kind] = true;
     toolDownloadStatus[kind] = const DownloadStatus();
@@ -687,6 +702,12 @@ class MediaImportProvider extends ChangeNotifier {
     _downloadCancel?.cancel();
     _activeService?.cancel();
     _activeInstaller?.kill();
+  }
+
+  @override
+  void dispose() {
+    _updateCheckTimer?.cancel();
+    super.dispose();
   }
 
   void reset() {

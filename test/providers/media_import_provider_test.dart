@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:open_note/providers/media_import_provider.dart';
 import 'package:open_note/services/media/media_downloader.dart';
 import 'package:open_note/services/media/media_import_service.dart';
+import 'package:open_note/services/media/media_import_settings.dart';
 import 'package:open_note/services/media/media_tool_service.dart';
 import 'package:open_note/services/media/tool_update_service.dart';
 import 'package:open_note/services/media/whisper_model_service.dart';
@@ -285,6 +286,13 @@ void main() {
       expect(p.toolDownloading[MediaToolKind.ytDlp] ?? false, isFalse);
       expect(p.toolFinishing[MediaToolKind.ytDlp] ?? false, isTrue);
 
+      // finishing 窗口内重复点击「更新」：守卫直接 return，不二次下载
+      unawaited(p.downloadTool(MediaToolKind.ytDlp));
+      await Future<void>.delayed(Duration.zero);
+      expect(fake.downloadCount, 1);
+      expect(p.toolDownloading[MediaToolKind.ytDlp] ?? false, isFalse);
+      expect(p.toolFinishing[MediaToolKind.ytDlp] ?? false, isTrue);
+
       tools.checkGate!.complete();
       await run;
       expect(p.toolFinishing[MediaToolKind.ytDlp] ?? false, isFalse);
@@ -540,6 +548,51 @@ void main() {
       expect(p.updateAvailableVersion[MediaToolKind.ffmpeg], isNull);
     });
 
+    test('全部被跳过（systemPath）时：不 fetch 也不写 24h 节流时间戳', () async {
+      final fetcher = _CountingFetcher('b7.0');
+      final p = MediaImportProvider(
+        toolService: _SystemToolService(() async => tmp.path),
+        modelService: _AllModelsService(() async => tmp.path),
+        updateService: ToolUpdateService(fetcher: fetcher.call),
+        clock: () => DateTime(2026, 1, 1, 12),
+      );
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+
+      await p.checkToolUpdates();
+
+      expect(fetcher.calls, 0);
+      expect(await MediaImportSettings().lastUpdateCheckAt(), isNull);
+    });
+
+    test('环境未检测（toolStatuses 空）时定时器顺延且不空转，填充后下一轮才检查',
+        () async {
+      final fetcher = _CountingFetcher('b7.0');
+      final p = makeUpdateProvider(fetcher);
+      await SharedPreferences.getInstance(); // 预热 mock 存储（纯微任务，FakeAsync 内可完成）
+
+      FakeAsync().run((async) {
+        // 1) toolStatuses 为空（splash 只调度未检测）：到点不 fetch；
+        //    顺延 60s 到点仍空 → 再顺延，fetch 恒为 0，也不写节流时间戳
+        p.scheduleUpdateCheck(delay: const Duration(milliseconds: 50));
+        async.elapse(const Duration(seconds: 1));
+        expect(fetcher.calls, 0);
+        async.elapse(const Duration(seconds: 61));
+        expect(fetcher.calls, 0);
+
+        // 2) 用户打开媒体 UI：startForFile 填充状态（fake 服务纯微任务可完成）
+        //    （不再 await 其 future——FakeAsync 区内创建的 future 出区后 await 会悬死）
+        unawaited(p.startForFile(File('${tmp.path}/a.mp4')));
+        async.elapse(const Duration(seconds: 1));
+        expect(p.toolStatuses[MediaToolKind.ffmpeg], isNotNull);
+
+        // 3) 重新调度：到点才真正执行检查
+        p.scheduleUpdateCheck(delay: const Duration(milliseconds: 50));
+        async.elapse(const Duration(seconds: 1));
+        expect(fetcher.calls, 1);
+        expect(p.updateAvailableVersion[MediaToolKind.ffmpeg], 'b7.0');
+      });
+    });
+
     test('定时器到点时操作进行中：顺延重试而非永久跳过，空闲后执行检查', () async {
       final fetcher = _CountingFetcher('b7.0');
       final p = makeUpdateProvider(fetcher);
@@ -634,6 +687,7 @@ class _CapturingDownloader extends MediaDownloader {
 class _HangingDownloader extends MediaDownloader {
   final Completer<void> started = Completer<void>();
   final Completer<void> release = Completer<void>();
+  int downloadCount = 0;
 
   _HangingDownloader();
 
@@ -646,6 +700,7 @@ class _HangingDownloader extends MediaDownloader {
     CancelToken? cancelToken,
     String? expectedSha256,
   }) async {
+    downloadCount++;
     onProgress?.call(0, 1000);
     onProgress?.call(500, 1000);
     started.complete();
