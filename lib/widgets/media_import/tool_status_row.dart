@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../../l10n/strings.g.dart';
 import '../../services/media/download_stats.dart';
 import '../../services/media/media_tool_service.dart';
+import '../../services/media/tool_update_service.dart';
 import '../../theme/design_tokens.dart';
 
 const Map<MediaToolKind, Map<String, String>> installGuides = {
@@ -84,6 +85,8 @@ class ToolStatusRow extends StatelessWidget {
   final bool autoInstalling;
   final bool uninstalling;
   final String? systemHint;
+  final String? updateVersion;
+  final bool checkingUpdate;
   final String guide;
   final VoidCallback? onAutoInstall;
   final VoidCallback? onDownload;
@@ -99,6 +102,8 @@ class ToolStatusRow extends StatelessWidget {
     required this.autoInstalling,
     this.uninstalling = false,
     this.systemHint,
+    this.updateVersion,
+    this.checkingUpdate = false,
     required this.guide,
     this.onAutoInstall,
     this.onDownload,
@@ -170,13 +175,39 @@ class ToolStatusRow extends StatelessWidget {
           : downloading
           ? null
           : ready
-          ? onUninstall != null
-                ? IconButton(
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (checkingUpdate)
+                  const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else if (updateVersion != null) ...[
+                  Text(
+                    t.media_env_updateAvailable(
+                      version: ToolUpdateService.normalizeTag(updateVersion) ??
+                          updateVersion!,
+                    ),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Colors.orange,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: onDownload,
+                    child: Text(t.media_env_update),
+                  ),
+                ],
+                if (onUninstall != null)
+                  IconButton(
                     icon: const Icon(Icons.delete_outline),
                     tooltip: t.media_env_uninstall,
                     onPressed: onUninstall,
-                  )
-                : null
+                  ),
+              ],
+            )
           : autoInstalling
             ? Row(
               mainAxisSize: MainAxisSize.min,

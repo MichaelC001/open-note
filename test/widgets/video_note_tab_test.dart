@@ -1,6 +1,7 @@
 // test/widgets/video_note_tab_test.dart
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,6 +11,7 @@ import 'package:open_note/providers/media_import_provider.dart';
 import 'package:open_note/providers/update_provider.dart';
 import 'package:open_note/services/media/media_downloader.dart';
 import 'package:open_note/services/media/media_tool_service.dart';
+import 'package:open_note/services/media/tool_update_service.dart';
 import 'package:open_note/services/media/whisper_model_service.dart';
 import 'package:open_note/utils/app_info.dart';
 import 'package:open_note/widgets/settings/video_note_tab.dart';
@@ -72,6 +74,37 @@ class _AllDownloadedFastService extends _FastModelService {
   Future<File?> localModelFile(WhisperModelTier tier) async => File('m.bin');
 }
 
+class _StubFetcher {
+  final String tag;
+  _StubFetcher(this.tag);
+  Future<Response<dynamic>> call(String url, Options options) async =>
+      Response<dynamic>(
+        data: {'tag_name': tag},
+        requestOptions: RequestOptions(path: url),
+      );
+}
+
+class _CapturingDownloader extends MediaDownloader {
+  String? lastUrl;
+
+  // 基类实现走真实 df 子进程，FakeAsync（widget 测试）下无法完成
+  @override
+  Future<int?> freeDiskBytes(String path) async => null;
+
+  @override
+  Future<File> download(
+    String directUrl, {
+    required File destFile,
+    MediaDownloadSourceMode mode = MediaDownloadSourceMode.auto,
+    void Function(int received, int total)? onProgress,
+    CancelToken? cancelToken,
+    String? expectedSha256,
+  }) async {
+    lastUrl = directUrl;
+    return destFile;
+  }
+}
+
 void main() {
   late Directory tmpTools;
   late Directory tmpModels;
@@ -91,12 +124,21 @@ void main() {
     } catch (_) {}
   });
 
-  MediaImportProvider makeProvider({bool toolsReady = false}) {
+  MediaImportProvider makeProvider({
+    bool toolsReady = false,
+    ToolUpdateService? updateService,
+    MediaDownloader? downloader,
+  }) {
     toolsFake = _CountingToolService(tmpTools, allReady: toolsReady);
     modelsFake = toolsReady
         ? _AllDownloadedFastService(tmpModels)
         : _FastModelService(tmpModels);
-    return MediaImportProvider(toolService: toolsFake, modelService: modelsFake);
+    return MediaImportProvider(
+      toolService: toolsFake,
+      modelService: modelsFake,
+      updateService: updateService,
+      downloader: downloader,
+    );
   }
 
   Future<void> pumpTab(WidgetTester tester, MediaImportProvider provider) async {
@@ -292,5 +334,39 @@ void main() {
     // 冲洗 SnackBar 自动消失 Timer（4s）及其退场动画，避免 pending timer
     await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('发现新版本显示可更新标记，点更新触发重新下载并清除标记',
+      (tester) async {
+    // 卡片含引擎/模型/路径行，默认 800x600 视口会溢出，与真实窗口不符
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final fetcher = _StubFetcher('b7.0'); // 远端 b7.0，本地 fake 版本 1.0 → 有更新
+    final fakeDl = _CapturingDownloader();
+    final provider = makeProvider(
+      toolsReady: true,
+      updateService: ToolUpdateService(fetcher: fetcher.call),
+      downloader: fakeDl,
+    );
+    await pumpTab(tester, provider);
+    await provider.checkEnvironment();
+    await provider.checkToolUpdates();
+    await tester.pumpAndSettle();
+
+    // appManaged ready 行尾出现橙色「可更新 v7.0」与「更新」按钮
+    expect(find.text('可更新 v7.0'), findsWidgets);
+    expect(find.text('更新'), findsWidgets);
+
+    // 点第一行（ffmpeg）的「更新」→ 走 onDownload 同链路重新下载覆盖
+    await tester.tap(find.text('更新').first);
+    // downloadTool 后续经真实 chmod 子进程（FakeAsync 下不完成，行尾停在
+    // finishing 转圈），只能用显式 pump 排空微任务，不能 pumpAndSettle
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(provider.updateAvailableVersion[MediaToolKind.ffmpeg], isNull);
+    expect(fakeDl.lastUrl, contains('/ffmpeg-static/releases/'));
   });
 }

@@ -1813,6 +1813,8 @@ class TranslationsEn extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get media_tier_desc_medium => '~6GB RAM · Moderate speed · Balanced accuracy';
 	@override String get media_tier_desc_largeV3Turbo => '~8GB RAM · Fast · Most accurate';
 	@override String get media_settings_sourcePath => 'Source media path';
+	@override String media_env_updateAvailable({required Object version}) => 'Update to v${version}';
+	@override String get media_env_update => 'Update';
 	@override String get media_env_background => 'Download continues in the background. Check Settings → Video to Note for progress.';
 	@override String get media_env_uninstall => 'Uninstall';
 	@override String get media_env_finishing => 'Downloaded · Installing…';

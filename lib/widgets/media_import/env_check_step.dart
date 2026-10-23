@@ -60,6 +60,8 @@ class EnvCheckStep extends StatelessWidget {
               finishing: p.toolFinishing[kind] ?? false,
               downloadStatus: p.toolDownloadStatus[kind],
               autoInstalling: p.toolInstalling[kind] ?? false,
+              updateVersion: p.updateAvailableVersion[kind],
+              checkingUpdate: p.updateChecking[kind] ?? false,
               guide: installGuides[kind]![platformKey]!,
               onAutoInstall: ToolStatusRow.canAutoInstall(kind, platformKey)
                   ? () => context.read<MediaImportProvider>().autoInstallTool(

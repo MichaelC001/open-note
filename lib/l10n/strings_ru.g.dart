@@ -1807,6 +1807,8 @@ class TranslationsRu extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get media_tier_desc_medium => '~6 ГБ ОЗУ · Средняя скорость · Сбалансированная точность';
 	@override String get media_tier_desc_largeV3Turbo => '~8 ГБ ОЗУ · Быстро · Максимальная точность';
 	@override String get media_settings_sourcePath => 'Путь к исходному медиа';
+	@override String media_env_updateAvailable({required Object version}) => 'Доступно v${version}';
+	@override String get media_env_update => 'Обновить';
 	@override String get media_env_background => 'Загрузка продолжается в фоне: Настройки → Видео в заметку.';
 	@override String get media_env_uninstall => 'Удалить';
 	@override String get media_env_finishing => 'Скачано · Установка…';

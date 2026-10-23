@@ -226,6 +226,8 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
       finishing: p.toolFinishing[kind] ?? false,
       downloadStatus: p.toolDownloadStatus[kind],
       autoInstalling: p.toolInstalling[kind] ?? false,
+      updateVersion: p.updateAvailableVersion[kind],
+      checkingUpdate: p.updateChecking[kind] ?? false,
       uninstalling: p.toolUninstalling[kind] ?? false,
       systemHint: (st?.ready ?? false) &&
               st?.source == MediaToolSource.systemPath &&

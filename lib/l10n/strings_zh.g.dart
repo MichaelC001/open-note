@@ -3069,6 +3069,12 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 	/// zh: '源媒体路径'
 	String get media_settings_sourcePath => '源媒体路径';
 
+	/// zh: '可更新 v{version}'
+	String media_env_updateAvailable({required Object version}) => '可更新 v${version}';
+
+	/// zh: '更新'
+	String get media_env_update => '更新';
+
 	/// zh: '下载已在后台进行，可在 设置→视频转笔记 查看进度'
 	String get media_env_background => '下载已在后台进行，可在 设置→视频转笔记 查看进度';
 
