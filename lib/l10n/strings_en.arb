@@ -2377,6 +2377,11 @@
   "media_env_updateAvailable": "Update to v{version}",
   "@media_env_updateAvailable": { "parameters": { "version": "String" } },
   "media_env_update": "Update",
+  "media_settings_timestamps": "Key timestamps",
+  "media_settings_polish": "Content polish level",
+  "media_polish_raw": "Verbatim transcript",
+  "media_polish_structured": "Structure only",
+  "media_polish_organized": "Full organize",
   "media_env_background":
       "Download continues in the background. Check Settings → Video to Note for progress.",
   "media_env_uninstall": "Uninstall",

@@ -81,6 +81,8 @@ void main() {
     final phases = <MediaImportPhase>[];
     final result = await svc.run(
       MediaImportRequest(localFile: src, tier: WhisperModelTier.base),
+      includeTimestamps: true,
+      polishLevel: ContentPolishLevel.organized,
       onProgress: (p, v) {
         if (phases.isEmpty || phases.last != p) phases.add(p);
       },
@@ -105,6 +107,8 @@ void main() {
     );
     final result = await svc.run(
       MediaImportRequest(localFile: src, tier: WhisperModelTier.base),
+      includeTimestamps: true,
+      polishLevel: ContentPolishLevel.organized,
     );
     expect(result.formattedByAI, isFalse);
     expect(result.markdown, contains('# 转录笔记'));
@@ -123,7 +127,9 @@ void main() {
     svc.cancel();
     await expectLater(
         svc.run(
-            MediaImportRequest(localFile: src, tier: WhisperModelTier.base)),
+            MediaImportRequest(localFile: src, tier: WhisperModelTier.base),
+            includeTimestamps: true,
+            polishLevel: ContentPolishLevel.organized),
         throwsA(isA<MediaImportException>()));
   });
 }

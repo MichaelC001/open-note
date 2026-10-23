@@ -8,6 +8,7 @@ import '../../providers/media_import_provider.dart';
 import '../../services/media/media_downloader.dart';
 import '../../services/media/media_import_settings.dart';
 import '../../services/media/media_tool_service.dart';
+import '../../services/media/transcript_formatter.dart';
 import '../../services/media/whisper_model_service.dart';
 import '../../theme/design_tokens.dart';
 import '../media_import/model_list.dart';
@@ -27,6 +28,8 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
   final MediaImportSettings _settings = MediaImportSettings();
   MediaDownloadSourceMode _source = MediaDownloadSourceMode.mirror;
   bool _deleteSource = true;
+  bool _includeTimestamps = false;
+  ContentPolishLevel _polish = ContentPolishLevel.structured;
   bool _loaded = false;
   late final Future<String> _modelsDirFuture =
       widget.modelService.modelsDir();
@@ -49,6 +52,8 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
   Future<void> _load() async {
     _source = await _settings.downloadSource();
     _deleteSource = await _settings.deleteSourceAfter();
+    _includeTimestamps = await _settings.includeTimestamps();
+    _polish = await _settings.polishLevel();
     _loaded = true;
     if (mounted) setState(() {});
   }
@@ -180,6 +185,41 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
                 setState(() => _deleteSource = v);
               },
             ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: Text(t.media_settings_timestamps),
+              value: _includeTimestamps,
+              activeThumbColor: DesignTokens.primary500,
+              onChanged: (v) async {
+                await _settings.setIncludeTimestamps(v);
+                setState(() => _includeTimestamps = v);
+              },
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: Text(t.media_settings_polish),
+              trailing: Text(
+                _polishLabel(t),
+                style: const TextStyle(
+                    fontSize: 12, color: DesignTokens.gray500),
+              ),
+              subtitle: Slider(
+                value: _polish.index.toDouble(),
+                min: 0,
+                max: 2,
+                divisions: 2,
+                label: _polishLabel(t),
+                activeColor: DesignTokens.primary500,
+                onChanged: (v) async {
+                  final level =
+                      ContentPolishLevel.values[v.round().clamp(0, 2)];
+                  await _settings.setPolishLevel(level);
+                  setState(() => _polish = level);
+                },
+              ),
+            ),
             FutureBuilder<String>(
               future: _sourceMediaDirFuture,
               builder: (context, snap) {
@@ -214,6 +254,12 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
       ),
     );
   }
+
+  String _polishLabel(Translations t) => switch (_polish) {
+        ContentPolishLevel.raw => t.media_polish_raw,
+        ContentPolishLevel.structured => t.media_polish_structured,
+        ContentPolishLevel.organized => t.media_polish_organized,
+      };
 
   Widget _toolRow(BuildContext context, MediaImportProvider p, Translations t,
       String platformKey, MediaToolKind kind) {

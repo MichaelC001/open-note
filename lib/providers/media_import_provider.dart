@@ -647,6 +647,8 @@ class MediaImportProvider extends ChangeNotifier {
 
     final hasAI = callAI != null;
     final formatter = hasAI ? TranscriptFormatter(callAI!) : null;
+    final includeTs = await settings.includeTimestamps();
+    final polish = await settings.polishLevel();
     final service = MediaImportService(
       toolService: toolService,
       modelService: modelService,
@@ -668,6 +670,8 @@ class MediaImportProvider extends ChangeNotifier {
             ? await runOverride(service, request)
             : await service.run(
                 request,
+                includeTimestamps: includeTs,
+                polishLevel: polish,
                 onProgress: (p, v) {
                   phase = p;
                   phaseProgress = v;

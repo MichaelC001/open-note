@@ -4,11 +4,14 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'media_downloader.dart';
+import 'transcript_formatter.dart';
 
 /// 视频转笔记用户偏好（下载源 / 完成后删除源文件）。
 class MediaImportSettings {
   static const _kSource = 'media_import_download_source';
   static const _kDelete = 'media_import_delete_source_after';
+  static const _kTimestamps = 'media_import_include_timestamps';
+  static const _kPolish = 'media_import_polish_level';
   static const _kVerifyCache = 'media_tool_verify_cache';
   static const _kLastUpdateCheckAt = 'media_tool_last_update_check_at';
   static const _kWhisperSourceTag = 'media_tool_whisper_cli_source_tag';
@@ -51,6 +54,31 @@ class MediaImportSettings {
   Future<void> setDeleteSourceAfter(bool v) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kDelete, v);
+  }
+
+  /// 笔记中是否保留关键时间戳（默认 false）。
+  Future<bool> includeTimestamps() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_kTimestamps) ?? false;
+  }
+
+  Future<void> setIncludeTimestamps(bool v) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kTimestamps, v);
+  }
+
+  /// 内容优化强度（默认 structured 结构格式化，按 name 解析兼容未知值）。
+  Future<ContentPolishLevel> polishLevel() async {
+    final prefs = await SharedPreferences.getInstance();
+    return ContentPolishLevel.values.firstWhere(
+      (l) => l.name == prefs.getString(_kPolish),
+      orElse: () => ContentPolishLevel.structured,
+    );
+  }
+
+  Future<void> setPolishLevel(ContentPolishLevel level) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kPolish, level.name);
   }
 
   /// 上次工具新版本检查时间（毫秒时间戳），用于 24h 节流。

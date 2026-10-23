@@ -1809,6 +1809,11 @@ class TranslationsRu extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get media_settings_sourcePath => 'Путь к исходному медиа';
 	@override String media_env_updateAvailable({required Object version}) => 'Доступно v${version}';
 	@override String get media_env_update => 'Обновить';
+	@override String get media_settings_timestamps => 'Ключевые метки времени';
+	@override String get media_settings_polish => 'Уровень обработки контента';
+	@override String get media_polish_raw => 'Дословная расшифровка';
+	@override String get media_polish_structured => 'Только структура';
+	@override String get media_polish_organized => 'Полная обработка';
 	@override String get media_env_background => 'Загрузка продолжается в фоне: Настройки → Видео в заметку.';
 	@override String get media_env_uninstall => 'Удалить';
 	@override String get media_env_finishing => 'Скачано · Установка…';

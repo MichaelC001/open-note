@@ -1809,6 +1809,11 @@ class TranslationsZhTw extends Translations with BaseTranslations<AppLocale, Tra
 	@override String get media_settings_sourcePath => '來源媒體路徑';
 	@override String media_env_updateAvailable({required Object version}) => '可更新 v${version}';
 	@override String get media_env_update => '更新';
+	@override String get media_settings_timestamps => '關鍵時間戳';
+	@override String get media_settings_polish => '內容優化強度';
+	@override String get media_polish_raw => '逐字稿';
+	@override String get media_polish_structured => '結構格式化';
+	@override String get media_polish_organized => '內容整理';
 	@override String get media_env_background => '下載已在背景進行，可在 設定→影片轉筆記 查看進度';
 	@override String get media_env_uninstall => '解除安裝';
 	@override String get media_env_finishing => '下載完成 · 安裝中…';

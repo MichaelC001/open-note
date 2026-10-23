@@ -125,6 +125,8 @@ class MediaImportService {
 
   Future<MediaImportResult> run(
     MediaImportRequest req, {
+    required bool includeTimestamps,
+    required ContentPolishLevel polishLevel,
     void Function(MediaImportPhase phase, double? progress)? onProgress,
   }) async {
     final taskId = const Uuid().v4();
@@ -178,10 +180,17 @@ class MediaImportService {
         if (formatter == null) {
           throw const MediaImportException('AI 未配置');
         }
-        markdown = await formatter!.format(transcript);
+        markdown = await formatter!.format(
+          transcript,
+          includeTimestamps: includeTimestamps,
+          level: polishLevel,
+        );
         ai = true;
       } catch (_) {
-        markdown = _fallbackMarkdown(transcript);
+        markdown = _fallbackMarkdown(
+          transcript,
+          includeTimestamps: includeTimestamps,
+        );
       }
       _ensureAlive();
 
@@ -221,8 +230,12 @@ class MediaImportService {
     }
   }
 
-  static String _fallbackMarkdown(Transcript t) =>
-      TranscriptFormatter(_neverCall).fallbackMarkdown(t);
+  static String _fallbackMarkdown(
+    Transcript t, {
+    required bool includeTimestamps,
+  }) =>
+      TranscriptFormatter(_neverCall)
+          .fallbackMarkdown(t, includeTimestamps: includeTimestamps);
 
   static Future<String> _neverCall(String p) async =>
       throw UnsupportedError('fallback only');

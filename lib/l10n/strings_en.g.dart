@@ -1815,6 +1815,11 @@ class TranslationsEn extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get media_settings_sourcePath => 'Source media path';
 	@override String media_env_updateAvailable({required Object version}) => 'Update to v${version}';
 	@override String get media_env_update => 'Update';
+	@override String get media_settings_timestamps => 'Key timestamps';
+	@override String get media_settings_polish => 'Content polish level';
+	@override String get media_polish_raw => 'Verbatim transcript';
+	@override String get media_polish_structured => 'Structure only';
+	@override String get media_polish_organized => 'Full organize';
 	@override String get media_env_background => 'Download continues in the background. Check Settings → Video to Note for progress.';
 	@override String get media_env_uninstall => 'Uninstall';
 	@override String get media_env_finishing => 'Downloaded · Installing…';

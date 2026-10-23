@@ -3075,6 +3075,21 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 	/// zh: '更新'
 	String get media_env_update => '更新';
 
+	/// zh: '关键时间戳'
+	String get media_settings_timestamps => '关键时间戳';
+
+	/// zh: '内容优化强度'
+	String get media_settings_polish => '内容优化强度';
+
+	/// zh: '逐字稿'
+	String get media_polish_raw => '逐字稿';
+
+	/// zh: '结构格式化'
+	String get media_polish_structured => '结构格式化';
+
+	/// zh: '内容整理'
+	String get media_polish_organized => '内容整理';
+
 	/// zh: '下载已在后台进行，可在 设置→视频转笔记 查看进度'
 	String get media_env_background => '下载已在后台进行，可在 设置→视频转笔记 查看进度';
 

@@ -10,7 +10,9 @@ import 'package:open_note/providers/language_provider.dart';
 import 'package:open_note/providers/media_import_provider.dart';
 import 'package:open_note/providers/update_provider.dart';
 import 'package:open_note/services/media/media_downloader.dart';
+import 'package:open_note/services/media/media_import_settings.dart';
 import 'package:open_note/services/media/media_tool_service.dart';
+import 'package:open_note/services/media/transcript_formatter.dart';
 import 'package:open_note/services/media/tool_update_service.dart';
 import 'package:open_note/services/media/whisper_model_service.dart';
 import 'package:open_note/utils/app_info.dart';
@@ -308,7 +310,8 @@ void main() {
   });
 
   testWidgets('源媒体路径行显示并可复制', (tester) async {
-    tester.view.physicalSize = const Size(1280, 900);
+    // 卡片新增时间戳开关与优化强度滑块后变高，900 视口令路径行落出视口不可点
+    tester.view.physicalSize = const Size(1280, 1100);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -334,6 +337,39 @@ void main() {
     // 冲洗 SnackBar 自动消失 Timer（4s）及其退场动画，避免 pending timer
     await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('关键时间戳开关与内容优化强度滑块渲染、默认值与持久化', (tester) async {
+    tester.view.physicalSize = const Size(1280, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final provider = makeProvider(toolsReady: true);
+    await pumpTab(tester, provider);
+    await tester.pumpAndSettle();
+
+    // 两新项渲染
+    expect(find.text('关键时间戳'), findsOneWidget);
+    expect(find.text('内容优化强度'), findsOneWidget);
+
+    // 开关默认关；默认档位为结构格式化
+    final tsSwitch = tester.widget<SwitchListTile>(find.ancestor(
+        of: find.text('关键时间戳'), matching: find.byType(SwitchListTile)));
+    expect(tsSwitch.value, isFalse);
+    expect(find.text('结构格式化'), findsOneWidget);
+
+    // 开关切到开 → 持久化
+    await tester.tap(find.text('关键时间戳'));
+    await tester.pumpAndSettle();
+    expect(await MediaImportSettings().includeTimestamps(), isTrue);
+
+    // 滑块切到最右档 organized → 持久化（重进读取验证）
+    await tester.drag(find.byType(Slider), const Offset(300, 0));
+    await tester.pumpAndSettle();
+    expect(await MediaImportSettings().polishLevel(),
+        ContentPolishLevel.organized);
+    expect(find.text('内容整理'), findsOneWidget);
+    expect(find.text('结构格式化'), findsNothing);
   });
 
   testWidgets('发现新版本显示可更新标记，点更新触发重新下载并清除标记',
