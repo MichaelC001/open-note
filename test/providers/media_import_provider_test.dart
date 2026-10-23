@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_note/providers/media_import_provider.dart';
 import 'package:open_note/services/media/media_downloader.dart';
@@ -537,6 +538,26 @@ void main() {
       await run;
 
       expect(p.updateAvailableVersion[MediaToolKind.ffmpeg], isNull);
+    });
+
+    test('定时器到点时操作进行中：顺延重试而非永久跳过，空闲后执行检查', () async {
+      final fetcher = _CountingFetcher('b7.0');
+      final p = makeUpdateProvider(fetcher);
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+      await SharedPreferences.getInstance(); // 预热 mock 存储（纯微任务，FakeAsync 内可完成）
+
+      FakeAsync().run((async) {
+        p.modelDownloading = true; // 模拟启动 15 秒内开始的长操作（如模型下载）
+        p.scheduleUpdateCheck(delay: const Duration(milliseconds: 50));
+
+        async.elapse(const Duration(seconds: 1));
+        expect(fetcher.calls, 0); // 忙：本轮跳过
+
+        p.modelDownloading = false; // 操作结束
+        async.elapse(const Duration(seconds: 61)); // 顺延的 60s 重试到点
+        expect(fetcher.calls, greaterThanOrEqualTo(1)); // 重试确实执行了检查
+        expect(p.updateAvailableVersion[MediaToolKind.ffmpeg], 'b7.0');
+      });
     });
   });
 }

@@ -168,11 +168,16 @@ class MediaImportProvider extends ChangeNotifier {
     }
   }
 
-  /// 静默定时检查工具新版本（默认延迟 15s；到点时若操作进行中则跳过本轮）。
+  /// 静默定时检查工具新版本（默认延迟 15s；到点时若操作进行中则顺延 60s 重试，
+  /// 避免会话内永不检查——24h 节流由 checkToolUpdates 内部兜底，重试零成本）。
   void scheduleUpdateCheck({Duration delay = const Duration(seconds: 15)}) {
     _updateCheckTimer?.cancel();
     _updateCheckTimer = Timer(delay, () {
-      if (!operationInProgress) checkToolUpdates();
+      if (operationInProgress) {
+        scheduleUpdateCheck(delay: const Duration(seconds: 60));
+        return;
+      }
+      checkToolUpdates();
     });
   }
 
