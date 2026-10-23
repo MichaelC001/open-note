@@ -1,6 +1,7 @@
 // lib/widgets/settings/video_note_tab.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../../l10n/strings.g.dart';
@@ -133,9 +134,13 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
                 ]);
               },
             ),
-          ]),
-          const SizedBox(height: 16),
-          _card(isDark, [
+          ],
+              ribbonAsset: isDark
+                  ? 'assets/svg/engine-ribbon-dark.svg'
+                  : 'assets/svg/engine-ribbon-light.svg',
+            ),
+            const SizedBox(height: 16),
+            _card(isDark, [
             Text(
               t.media_settings_title,
               style: TextStyle(
@@ -348,20 +353,35 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
     if (ok == true) await p.deleteModel(tier);
   }
 
-  Widget _card(bool isDark, List<Widget> children) => Container(
-        padding: const EdgeInsets.all(16),
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: isDark ? DesignTokens.darkSurface : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isDark ? DesignTokens.darkBorder : DesignTokens.gray200,
-            width: 1,
-          ),
+  Widget _card(bool isDark, List<Widget> children, {String? ribbonAsset}) {
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children,
+    );
+    return Container(
+      padding: const EdgeInsets.all(16),
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: isDark ? DesignTokens.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? DesignTokens.darkBorder : DesignTokens.gray200,
+          width: 1,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: children,
-        ),
-      );
+      ),
+      // ribbonAsset：左上角主题装饰图，画在卡片背景之上、内容之下
+      child: ribbonAsset == null
+          ? content
+          : Stack(
+              children: [
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  child: SvgPicture.asset(ribbonAsset, width: 180),
+                ),
+                content,
+              ],
+            ),
+    );
+  }
 }

@@ -83,6 +83,8 @@ void main() {
           includeTimestamps: true, level: ContentPolishLevel.structured);
       expect(prompts.single.contains('严禁改写'), isTrue);
       expect(prompts.single.contains('不要划分章节'), isTrue);
+      expect(prompts.single.contains('要点符号（-）'), isTrue);
+      expect(prompts.single.contains('不得添加标题'), isTrue);
       expect(prompts.single.contains('## '), isFalse);
     });
 

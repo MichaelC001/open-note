@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_note/l10n/strings.g.dart';
 import 'package:open_note/providers/language_provider.dart';
@@ -217,6 +218,13 @@ void main() {
     expect(find.text('base'), findsOneWidget);
     expect(find.text('large-v3-turbo'), findsOneWidget);
     expect(find.textContaining('v1'), findsWidgets); // 就绪版本号
+  });
+
+  testWidgets('引擎卡片左上角显示主题 ribbon 背景图', (tester) async {
+    final provider = makeProvider(toolsReady: true);
+    await pumpTab(tester, provider);
+    await tester.pumpAndSettle();
+    expect(find.byType(SvgPicture), findsOneWidget);
   });
 
   testWidgets('显示模型下载目录并可复制', (tester) async {
