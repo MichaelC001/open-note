@@ -47,6 +47,11 @@ class EnvCheckStep extends StatelessWidget {
           ),
           if (p.errorMessage != null)
             ErrorBanner(message: p.errorMessage!, detail: p.errorDetail),
+          Text(
+            t.media_env_engines,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
           for (final kind in MediaToolKind.values.where(p.isToolRequired))
             ToolStatusRow(
               kind: kind,

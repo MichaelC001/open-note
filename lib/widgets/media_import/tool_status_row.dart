@@ -124,9 +124,9 @@ class ToolStatusRow extends StatelessWidget {
         color: ready ? Colors.green : Colors.orange,
       ),
       title: Text(switch (kind) {
-        MediaToolKind.ffmpeg => 'ffmpeg',
-        MediaToolKind.ytDlp => 'yt-dlp',
-        MediaToolKind.whisperCli => 'whisper.cpp',
+        MediaToolKind.ffmpeg => t.media_tool_ffmpeg,
+        MediaToolKind.ytDlp => t.media_tool_ytDlp,
+        MediaToolKind.whisperCli => t.media_tool_whisperCli,
       }),
       subtitle: finishing
           ? Row(

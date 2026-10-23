@@ -8,6 +8,7 @@ import 'package:open_note/l10n/strings.g.dart';
 import 'package:open_note/providers/language_provider.dart';
 import 'package:open_note/providers/media_import_provider.dart';
 import 'package:open_note/providers/update_provider.dart';
+import 'package:open_note/services/media/media_downloader.dart';
 import 'package:open_note/services/media/media_tool_service.dart';
 import 'package:open_note/services/media/whisper_model_service.dart';
 import 'package:open_note/utils/app_info.dart';
@@ -149,7 +150,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('下载源'), findsOneWidget);
-    expect(find.text('默认识别模型'), findsOneWidget);
+    expect(find.text('默认识别模型'), findsNothing);
     expect(find.text('完成后删除下载的源媒体'), findsOneWidget);
 
     // 回到首选项，确认分区已移出
@@ -164,15 +165,22 @@ void main() {
     await pumpTab(tester, provider);
     await provider.checkEnvironment();
     await tester.pumpAndSettle();
-    expect(find.text('ffmpeg'), findsOneWidget);
-    expect(find.text('yt-dlp'), findsOneWidget);
-    expect(find.text('whisper.cpp'), findsOneWidget);
+    expect(find.text('媒体处理引擎（ffmpeg）'), findsOneWidget);
+    expect(find.text('媒体嗅探引擎（yt-dlp）'), findsOneWidget);
+    expect(find.text('语音识别引擎（whisper.cpp）'), findsOneWidget);
+    expect(find.text('引擎'), findsOneWidget);
+    expect(find.textContaining('约 2GB 内存'), findsOneWidget);
     expect(find.text('base'), findsOneWidget);
     expect(find.text('large-v3-turbo'), findsOneWidget);
     expect(find.textContaining('v1'), findsWidgets); // 就绪版本号
   });
 
   testWidgets('显示模型下载目录并可复制', (tester) async {
+    // 卡片新增引擎标题与模型描述行后变高，800x600 默认面会令目录行溢出视口
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     String? clipboardText;
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
         SystemChannels.platform, (call) async {
@@ -187,9 +195,10 @@ void main() {
     await pumpTab(tester, provider);
     await provider.checkEnvironment();
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.folder_open), findsOneWidget);
+    expect(find.byIcon(Icons.folder_open), findsNWidgets(2));
     expect(find.textContaining('whisper_models'), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.copy));
+    expect(find.textContaining('media_import_tmp'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.copy).first);
     await tester.pump();
     expect(find.byType(SnackBar), findsOneWidget);
     expect(clipboardText, '${tmpModels.path}/whisper_models');
@@ -234,5 +243,54 @@ void main() {
     await tester.tap(find.text('删除').last);
     await tester.pumpAndSettle();
     expect(provider.downloadedTiers.contains(WhisperModelTier.base), isFalse);
+  });
+
+  testWidgets('下载源缺省镜像优先且排首位；隐藏默认模型行；引擎标题与模型硬件说明',
+      (tester) async {
+    final provider = makeProvider(toolsReady: true);
+    await pumpTab(tester, provider);
+    await tester.pumpAndSettle();
+
+    expect(find.text('引擎'), findsOneWidget);
+    expect(find.text('默认识别模型'), findsNothing);
+    expect(find.text('推荐（镜像优先）'), findsOneWidget);
+    expect(find.textContaining('约 2GB 内存'), findsOneWidget);
+    final dd = tester.widget<DropdownButton<MediaDownloadSourceMode>>(
+        find.byType(DropdownButton<MediaDownloadSourceMode>));
+    expect(dd.value, MediaDownloadSourceMode.mirror);
+    expect(dd.items!.map((i) => i.value).toList(), [
+      MediaDownloadSourceMode.mirror,
+      MediaDownloadSourceMode.auto,
+      MediaDownloadSourceMode.direct,
+    ]);
+  });
+
+  testWidgets('源媒体路径行显示并可复制', (tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    String? clipboardText;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        clipboardText = (call.arguments as Map)['text'] as String?;
+      }
+      return null;
+    });
+    addTearDown(() => tester.binding.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, null));
+    final provider = makeProvider(toolsReady: true);
+    await pumpTab(tester, provider);
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('media_import_tmp'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.copy).last);
+    await tester.pump();
+    expect(find.byType(SnackBar), findsOneWidget);
+    expect(clipboardText, '${tmpModels.path}/media_import_tmp');
+    // 冲洗 SnackBar 自动消失 Timer（4s）及其退场动画，避免 pending timer
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
   });
 }

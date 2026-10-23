@@ -1786,9 +1786,9 @@ class TranslationsRu extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get media_done_again => 'Конвертировать ещё';
 	@override String get media_settings_title => 'Видео в заметку';
 	@override String get media_settings_source => 'Источник загрузки';
-	@override String get media_settings_sourceAuto => 'Авто (напрямую + зеркало)';
+	@override String get media_settings_sourceAuto => 'Сначала напрямую';
 	@override String get media_settings_sourceDirect => 'Только напрямую';
-	@override String get media_settings_sourceMirror => 'Сначала зеркало';
+	@override String get media_settings_sourceMirror => 'Рекомендуется (зеркало)';
 	@override String get media_settings_defaultModel => 'Модель по умолчанию';
 	@override String get media_settings_defaultModelAuto => 'Автоподбор';
 	@override String media_dl_eta({required Object time}) => 'осталось ${time}';
@@ -1799,6 +1799,14 @@ class TranslationsRu extends Translations with BaseTranslations<AppLocale, Trans
 	@override String media_env_modelDeleteConfirmTitle({required Object name}) => 'Удалить модель ${name}?';
 	@override String get media_env_modelDeleteConfirmBody => 'Скачанный файл модели будет удалён; повторная загрузка доступна в любой момент.';
 	@override String get media_env_useManager => 'Установлено системным менеджером пакетов; удаление через терминал.';
+	@override String get media_tool_ffmpeg => 'Медиа-движок (ffmpeg)';
+	@override String get media_tool_ytDlp => 'Медиа-движок загрузки (yt-dlp)';
+	@override String get media_tool_whisperCli => 'Движок распознавания речи (whisper.cpp)';
+	@override String get media_env_engines => 'Движки';
+	@override String get media_tier_desc_base => '~2 ГБ ОЗУ · Максимальная скорость · Базовая точность';
+	@override String get media_tier_desc_medium => '~6 ГБ ОЗУ · Средняя скорость · Сбалансированная точность';
+	@override String get media_tier_desc_largeV3Turbo => '~8 ГБ ОЗУ · Быстро · Максимальная точность';
+	@override String get media_settings_sourcePath => 'Путь к исходному медиа';
 	@override String get media_env_background => 'Загрузка продолжается в фоне: Настройки → Видео в заметку.';
 	@override String get media_env_uninstall => 'Удалить';
 	@override String get media_env_finishing => 'Скачано · Установка…';

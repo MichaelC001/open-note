@@ -3006,14 +3006,14 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 	/// zh: '下载源'
 	String get media_settings_source => '下载源';
 
-	/// zh: '自动（直连+镜像回退）'
-	String get media_settings_sourceAuto => '自动（直连+镜像回退）';
+	/// zh: '直连优先'
+	String get media_settings_sourceAuto => '直连优先';
 
 	/// zh: '仅直连'
 	String get media_settings_sourceDirect => '仅直连';
 
-	/// zh: '镜像优先'
-	String get media_settings_sourceMirror => '镜像优先';
+	/// zh: '推荐（镜像优先）'
+	String get media_settings_sourceMirror => '推荐（镜像优先）';
 
 	/// zh: '默认识别模型'
 	String get media_settings_defaultModel => '默认识别模型';
@@ -3044,6 +3044,30 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 
 	/// zh: '通过系统包管理器安装，请在终端用对应命令卸载'
 	String get media_env_useManager => '通过系统包管理器安装，请在终端用对应命令卸载';
+
+	/// zh: '媒体处理引擎（ffmpeg）'
+	String get media_tool_ffmpeg => '媒体处理引擎（ffmpeg）';
+
+	/// zh: '媒体嗅探引擎（yt-dlp）'
+	String get media_tool_ytDlp => '媒体嗅探引擎（yt-dlp）';
+
+	/// zh: '语音识别引擎（whisper.cpp）'
+	String get media_tool_whisperCli => '语音识别引擎（whisper.cpp）';
+
+	/// zh: '引擎'
+	String get media_env_engines => '引擎';
+
+	/// zh: '约 2GB 内存 · 速度最快 · 基础准确度'
+	String get media_tier_desc_base => '约 2GB 内存 · 速度最快 · 基础准确度';
+
+	/// zh: '约 6GB 内存 · 速度中等 · 准确度均衡'
+	String get media_tier_desc_medium => '约 6GB 内存 · 速度中等 · 准确度均衡';
+
+	/// zh: '约 8GB 内存 · 速度快 · 识别最准确'
+	String get media_tier_desc_largeV3Turbo => '约 8GB 内存 · 速度快 · 识别最准确';
+
+	/// zh: '源媒体路径'
+	String get media_settings_sourcePath => '源媒体路径';
 
 	/// zh: '下载已在后台进行，可在 设置→视频转笔记 查看进度'
 	String get media_env_background => '下载已在后台进行，可在 设置→视频转笔记 查看进度';

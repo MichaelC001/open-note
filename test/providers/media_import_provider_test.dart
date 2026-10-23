@@ -94,6 +94,17 @@ void main() {
     expect(p.environmentReady, isTrue);
   });
 
+  test('checkEnvironment 后 selectedTier==recommendedTier（不再读默认模型档设置）',
+      () async {
+    // 预置历史默认模型档偏好：实现不再读取该设置时，选中档恒等于推荐档
+    SharedPreferences.setMockInitialValues(
+        <String, Object>{'media_import_default_model': 'base'});
+    final p = makeProvider();
+    await p.checkEnvironment();
+    expect(p.selectedTier, p.recommendedTier);
+    expect(p.selectedTier, WhisperModelTier.largeV3Turbo);
+  });
+
   test('URL 来源时 yt-dlp 必检', () async {
     final p = makeProvider();
     await p.startForUrl('https://example.com/v');

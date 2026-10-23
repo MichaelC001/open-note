@@ -25,12 +25,14 @@ class VideoNoteTab extends StatefulWidget {
 
 class _VideoNoteTabState extends State<VideoNoteTab> {
   final MediaImportSettings _settings = MediaImportSettings();
-  MediaDownloadSourceMode _source = MediaDownloadSourceMode.auto;
-  WhisperModelTier? _tier;
+  MediaDownloadSourceMode _source = MediaDownloadSourceMode.mirror;
   bool _deleteSource = true;
   bool _loaded = false;
   late final Future<String> _modelsDirFuture =
       widget.modelService.modelsDir();
+  late final Future<String> _sourceMediaDirFuture =
+      widget.modelService.resolveBaseDir()
+          .then((dir) => '$dir/media_import_tmp');
 
   @override
   void initState() {
@@ -46,7 +48,6 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
 
   Future<void> _load() async {
     _source = await _settings.downloadSource();
-    _tier = await _settings.defaultTier();
     _deleteSource = await _settings.deleteSourceAfter();
     _loaded = true;
     if (mounted) setState(() {});
@@ -88,6 +89,12 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
             ),
             if (p.errorMessage != null)
               ErrorBanner(message: p.errorMessage!, detail: p.errorDetail),
+            Text(
+              t.media_env_engines,
+              style: const TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 4),
             for (final kind in MediaToolKind.values)
               _toolRow(context, p, t, platformKey, kind),
             const Divider(height: 24),
@@ -143,6 +150,10 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
                 value: _source,
                 items: [
                   DropdownMenuItem(
+                    value: MediaDownloadSourceMode.mirror,
+                    child: Text(t.media_settings_sourceMirror),
+                  ),
+                  DropdownMenuItem(
                     value: MediaDownloadSourceMode.auto,
                     child: Text(t.media_settings_sourceAuto),
                   ),
@@ -150,39 +161,11 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
                     value: MediaDownloadSourceMode.direct,
                     child: Text(t.media_settings_sourceDirect),
                   ),
-                  DropdownMenuItem(
-                    value: MediaDownloadSourceMode.mirror,
-                    child: Text(t.media_settings_sourceMirror),
-                  ),
                 ],
                 onChanged: (v) async {
                   if (v == null) return;
                   await _settings.setDownloadSource(v);
                   setState(() => _source = v);
-                },
-              ),
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: Text(t.media_settings_defaultModel),
-              trailing: DropdownButton<WhisperModelTier?>(
-                value: _tier,
-                items: [
-                  DropdownMenuItem(
-                    child: Text(t.media_settings_defaultModelAuto),
-                  ),
-                  for (final tier in WhisperModelTier.values)
-                    DropdownMenuItem(
-                      value: tier,
-                      child: Text(
-                        WhisperModelService.infoFor(tier).displayLabel,
-                      ),
-                    ),
-                ],
-                onChanged: (v) async {
-                  await _settings.setDefaultTier(v);
-                  setState(() => _tier = v);
                 },
               ),
             ),
@@ -195,6 +178,35 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
               onChanged: (v) async {
                 await _settings.setDeleteSourceAfter(v);
                 setState(() => _deleteSource = v);
+              },
+            ),
+            FutureBuilder<String>(
+              future: _sourceMediaDirFuture,
+              builder: (context, snap) {
+                final dir = snap.data ?? '';
+                return Row(children: [
+                  const Icon(Icons.folder_open,
+                      size: 16, color: DesignTokens.gray500),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(dir,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 11, color: DesignTokens.gray500)),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.copy, size: 16),
+                    tooltip: t.media_settings_copyPath,
+                    onPressed: dir.isEmpty
+                        ? null
+                        : () {
+                            Clipboard.setData(ClipboardData(text: dir));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                    content: Text(t.media_env_copied)));
+                          },
+                  ),
+                ]);
               },
             ),
           ]),

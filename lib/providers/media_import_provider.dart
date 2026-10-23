@@ -140,8 +140,7 @@ class MediaImportProvider extends ChangeNotifier {
         _notify();
       }
       recommendedTier = await modelService.recommendTierForDevice();
-      final fixed = await settings.defaultTier();
-      selectedTier = fixed ?? recommendedTier;
+      selectedTier = recommendedTier;
       downloadedTiers.clear();
       for (final t in WhisperModelTier.values) {
         if (await modelService.localModelFile(t) != null) {

@@ -139,6 +139,19 @@ class _ModelTile extends StatelessWidget {
                         color: DesignTokens.gray500,
                       ),
                     ),
+                  const SizedBox(height: 2),
+                  Text(
+                    switch (tier) {
+                      WhisperModelTier.base => t.media_tier_desc_base,
+                      WhisperModelTier.medium => t.media_tier_desc_medium,
+                      WhisperModelTier.largeV3Turbo =>
+                        t.media_tier_desc_largeV3Turbo,
+                    },
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: DesignTokens.gray500,
+                    ),
+                  ),
                 ],
               ),
             ),

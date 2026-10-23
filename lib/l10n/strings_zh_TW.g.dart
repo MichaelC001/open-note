@@ -1786,9 +1786,9 @@ class TranslationsZhTw extends Translations with BaseTranslations<AppLocale, Tra
 	@override String get media_done_again => '再轉一個';
 	@override String get media_settings_title => '影片轉筆記';
 	@override String get media_settings_source => '下載來源';
-	@override String get media_settings_sourceAuto => '自動（直連+鏡像回退）';
+	@override String get media_settings_sourceAuto => '直連優先';
 	@override String get media_settings_sourceDirect => '僅直連';
-	@override String get media_settings_sourceMirror => '鏡像優先';
+	@override String get media_settings_sourceMirror => '推薦（鏡像優先）';
 	@override String get media_settings_defaultModel => '預設辨識模型';
 	@override String get media_settings_defaultModelAuto => '自動推薦';
 	@override String media_dl_eta({required Object time}) => '剩餘 ${time}';
@@ -1799,6 +1799,14 @@ class TranslationsZhTw extends Translations with BaseTranslations<AppLocale, Tra
 	@override String media_env_modelDeleteConfirmTitle({required Object name}) => '確定刪除模型 ${name}？';
 	@override String get media_env_modelDeleteConfirmBody => '將刪除已下載的模型檔案，需要時可重新下載。';
 	@override String get media_env_useManager => '透過系統套件管理器安裝，請在終端機用對應命令解除安裝';
+	@override String get media_tool_ffmpeg => '媒體處理引擎（ffmpeg）';
+	@override String get media_tool_ytDlp => '媒體嗅探引擎（yt-dlp）';
+	@override String get media_tool_whisperCli => '語音辨識引擎（whisper.cpp）';
+	@override String get media_env_engines => '引擎';
+	@override String get media_tier_desc_base => '約 2GB 記憶體 · 速度最快 · 基礎準確度';
+	@override String get media_tier_desc_medium => '約 6GB 記憶體 · 速度中等 · 準確度均衡';
+	@override String get media_tier_desc_largeV3Turbo => '約 8GB 記憶體 · 速度快 · 辨識最準確';
+	@override String get media_settings_sourcePath => '來源媒體路徑';
 	@override String get media_env_background => '下載已在背景進行，可在 設定→影片轉筆記 查看進度';
 	@override String get media_env_uninstall => '解除安裝';
 	@override String get media_env_finishing => '下載完成 · 安裝中…';

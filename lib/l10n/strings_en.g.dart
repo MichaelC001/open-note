@@ -1792,9 +1792,9 @@ class TranslationsEn extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get media_done_again => 'Convert another';
 	@override String get media_settings_title => 'Video to Note';
 	@override String get media_settings_source => 'Download source';
-	@override String get media_settings_sourceAuto => 'Auto (direct + mirror fallback)';
+	@override String get media_settings_sourceAuto => 'Direct first';
 	@override String get media_settings_sourceDirect => 'Direct only';
-	@override String get media_settings_sourceMirror => 'Mirror first';
+	@override String get media_settings_sourceMirror => 'Recommended (mirror first)';
 	@override String get media_settings_defaultModel => 'Default model';
 	@override String get media_settings_defaultModelAuto => 'Auto recommend';
 	@override String media_dl_eta({required Object time}) => '${time} left';
@@ -1805,6 +1805,14 @@ class TranslationsEn extends Translations with BaseTranslations<AppLocale, Trans
 	@override String media_env_modelDeleteConfirmTitle({required Object name}) => 'Delete model ${name}?';
 	@override String get media_env_modelDeleteConfirmBody => 'The downloaded model file will be removed. You can re-download it anytime.';
 	@override String get media_env_useManager => 'Installed via a system package manager; uninstall from the terminal.';
+	@override String get media_tool_ffmpeg => 'Media engine (ffmpeg)';
+	@override String get media_tool_ytDlp => 'Media downloader engine (yt-dlp)';
+	@override String get media_tool_whisperCli => 'Speech recognition engine (whisper.cpp)';
+	@override String get media_env_engines => 'Engines';
+	@override String get media_tier_desc_base => '~2GB RAM · Fastest · Basic accuracy';
+	@override String get media_tier_desc_medium => '~6GB RAM · Moderate speed · Balanced accuracy';
+	@override String get media_tier_desc_largeV3Turbo => '~8GB RAM · Fast · Most accurate';
+	@override String get media_settings_sourcePath => 'Source media path';
 	@override String get media_env_background => 'Download continues in the background. Check Settings → Video to Note for progress.';
 	@override String get media_env_uninstall => 'Uninstall';
 	@override String get media_env_finishing => 'Downloaded · Installing…';
