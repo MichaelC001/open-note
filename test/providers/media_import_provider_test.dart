@@ -6,6 +6,7 @@ import 'package:open_note/providers/media_import_provider.dart';
 import 'package:open_note/services/media/media_downloader.dart';
 import 'package:open_note/services/media/media_import_service.dart';
 import 'package:open_note/services/media/media_tool_service.dart';
+import 'package:open_note/services/media/tool_update_service.dart';
 import 'package:open_note/services/media/whisper_model_service.dart';
 import 'package:open_note/services/media/process_runner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -435,6 +436,99 @@ void main() {
       expect(fake.lastUrl, isNot(contains('/yt-dlp/')));
     });
   });
+  group('工具静默新版本检查（checkToolUpdates）', () {
+    MediaImportProvider makeUpdateProvider(_CountingFetcher fetcher) =>
+        MediaImportProvider(
+          toolService: _MixedSourceToolService(() async => tmp.path),
+          modelService: _AllModelsService(() async => tmp.path),
+          updateService: ToolUpdateService(fetcher: fetcher.call),
+          clock: () => DateTime(2026, 1, 1, 12),
+        );
+
+    test('只检查 ready+appManaged 工具，systemPath/无状态跳过', () async {
+      final fetcher = _CountingFetcher('b7.0');
+      final p = makeUpdateProvider(fetcher);
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+
+      await p.checkToolUpdates();
+
+      expect(fetcher.calls, 1);
+      expect(fetcher.urls.single,
+          contains('repos/eugeneware/ffmpeg-static/releases/latest'));
+    });
+
+    test('发现新版本写入 updateAvailableVersion 并复位 checking', () async {
+      final fetcher = _CountingFetcher('b7.0');
+      final p = makeUpdateProvider(fetcher);
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+
+      await p.checkToolUpdates();
+
+      expect(p.updateAvailableVersion[MediaToolKind.ffmpeg], 'b7.0');
+      expect(p.updateChecking[MediaToolKind.ffmpeg] ?? false, isFalse);
+    });
+
+    test('24h 内二次调用被节流跳过（fetch 次数不变）', () async {
+      final fetcher = _CountingFetcher('b7.0');
+      final p = makeUpdateProvider(fetcher);
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+
+      await p.checkToolUpdates();
+      expect(fetcher.calls, 1);
+      await p.checkToolUpdates();
+      expect(fetcher.calls, 1);
+    });
+
+    test('本地版本等于远端时不写入更新', () async {
+      final fetcher = _CountingFetcher('b6.0'); // normalize 后 == 本地 6.0
+      final p = makeUpdateProvider(fetcher);
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+
+      await p.checkToolUpdates();
+
+      expect(p.updateAvailableVersion[MediaToolKind.ffmpeg], isNull);
+    });
+  });
+}
+
+class _CountingFetcher {
+  int calls = 0;
+  final List<String> urls = [];
+  final String tag;
+  _CountingFetcher(this.tag);
+  Future<Response<dynamic>> call(String url, Options options) async {
+    calls++;
+    urls.add(url);
+    return Response<dynamic>(
+      data: {'tag_name': tag},
+      requestOptions: RequestOptions(path: url),
+    );
+  }
+}
+
+class _MixedSourceToolService extends MediaToolService {
+  _MixedSourceToolService(Future<String> Function() base)
+      : super(resolveBaseDir: base);
+  @override
+  Future<MediaToolStatus> check(MediaToolKind kind,
+      {bool forceVerify = false}) async {
+    if (kind == MediaToolKind.whisperCli) {
+      return const MediaToolStatus(
+        kind: MediaToolKind.whisperCli,
+        ready: true,
+        path: '/usr/bin/whisper-cli',
+        version: 'ready',
+        source: MediaToolSource.systemPath,
+      );
+    }
+    return MediaToolStatus(
+      kind: kind,
+      ready: true,
+      path: 'fake',
+      version: '6.0',
+      source: MediaToolSource.appManaged,
+    );
+  }
 }
 
 class _CapturingDownloader extends MediaDownloader {

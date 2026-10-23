@@ -12,6 +12,7 @@ import '../services/media/media_downloader.dart';
 import '../services/media/media_import_service.dart';
 import '../services/media/media_import_settings.dart';
 import '../services/media/media_tool_service.dart';
+import '../services/media/tool_update_service.dart';
 import '../services/media/process_runner.dart';
 import '../services/media/transcript_formatter.dart';
 import '../services/media/whisper_model_service.dart';
@@ -28,6 +29,8 @@ class MediaImportProvider extends ChangeNotifier {
   final Future<String> Function(String prompt)? callAI;
   final Future<ProcessRunResult> Function(String, List<String>) installerRunner;
   final Future<String?> Function() brewPathResolver;
+  final ToolUpdateService updateService;
+  final DateTime Function() clock;
 
   MediaImportProvider({
     MediaToolService? toolService,
@@ -36,11 +39,15 @@ class MediaImportProvider extends ChangeNotifier {
     this.callAI,
     Future<ProcessRunResult> Function(String, List<String>)? installerRunner,
     Future<String?> Function()? brewPathResolver,
+    ToolUpdateService? updateService,
+    DateTime Function()? clock,
   }) : toolService = toolService ?? _defaultToolService(),
        modelService = modelService ?? WhisperModelService(),
        downloader = downloader ?? MediaDownloader(),
        installerRunner = installerRunner ?? _defaultInstallerRunner,
-       brewPathResolver = brewPathResolver ?? _defaultBrewPathResolver;
+       brewPathResolver = brewPathResolver ?? _defaultBrewPathResolver,
+       updateService = updateService ?? ToolUpdateService(),
+       clock = clock ?? DateTime.now;
 
   /// 默认工具服务：接 SharedPreferences 验证缓存（yt-dlp 等 spawn 慢的二进制免重复验证）。
   static MediaToolService _defaultToolService() {
@@ -61,6 +68,9 @@ class MediaImportProvider extends ChangeNotifier {
   final Map<MediaToolKind, bool> toolFinishing = {};
   final Map<MediaToolKind, bool> toolInstalling = {};
   final Map<MediaToolKind, bool> toolUninstalling = {};
+  final Map<MediaToolKind, String?> updateAvailableVersion = {};
+  final Map<MediaToolKind, bool> updateChecking = {};
+  Timer? _updateCheckTimer;
   bool modelDeleting = false;
   final Map<MediaToolKind, DownloadStatus> toolDownloadStatus = {};
   final Map<String, DownloadSpeedTracker> _downloadTrackers = {};
@@ -157,6 +167,59 @@ class MediaImportProvider extends ChangeNotifier {
     }
   }
 
+  /// 静默定时检查工具新版本（默认延迟 15s；到点时若操作进行中则跳过本轮）。
+  void scheduleUpdateCheck({Duration delay = const Duration(seconds: 15)}) {
+    _updateCheckTimer?.cancel();
+    _updateCheckTimer = Timer(delay, () {
+      if (!operationInProgress) checkToolUpdates();
+    });
+  }
+
+  /// 静默检查 appManaged 工具的新版本（24h 节流，全程不抛错）。
+  Future<void> checkToolUpdates() async {
+    try {
+      final last = await settings.lastUpdateCheckAt();
+      if (last != null &&
+          clock().difference(last) < const Duration(hours: 24)) {
+        return;
+      }
+      for (final kind in MediaToolKind.values) {
+        final st = toolStatuses[kind];
+        if (st == null ||
+            !st.ready ||
+            st.source != MediaToolSource.appManaged) {
+          continue;
+        }
+        try {
+          updateChecking[kind] = true;
+          _notify();
+          final latest = await updateService.fetchLatestVersion(kind);
+          if (latest != null) {
+            final stored = kind == MediaToolKind.whisperCli
+                ? await settings.whisperCliSourceTag()
+                : null;
+            if (ToolUpdateService.hasUpdate(
+              localVersion: st.version,
+              remoteTag: latest,
+              kind: kind,
+              storedSourceTag: stored,
+            )) {
+              updateAvailableVersion[kind] = latest;
+            }
+          }
+        } catch (_) {
+          // 单个工具检查失败不影响后续工具
+        } finally {
+          updateChecking[kind] = false;
+          _notify();
+        }
+      }
+      await settings.setLastUpdateCheckAt(clock());
+    } catch (_) {
+      // 更新检查绝不影响主流程
+    }
+  }
+
   void _markFinishing(MediaToolKind kind) {
     toolDownloading[kind] = false;
     toolFinishing[kind] = true;
@@ -164,6 +227,7 @@ class MediaImportProvider extends ChangeNotifier {
   }
 
   Future<void> downloadTool(MediaToolKind kind) async {
+    updateAvailableVersion[kind] = null;
     toolDownloading[kind] = true;
     toolDownloadStatus[kind] = const DownloadStatus();
     _downloadTrackers['tool:${kind.name}'] = DownloadSpeedTracker();
@@ -223,6 +287,12 @@ class MediaImportProvider extends ChangeNotifier {
           },
         );
         _markFinishing(kind);
+        final sourceTag = ToolUpdateService.whisperTagFromUrl(directUrl);
+        if (sourceTag != null) {
+          try {
+            await settings.setWhisperCliSourceTag(sourceTag);
+          } catch (_) {}
+        }
         final extractDir =
             '$dir/_extract_${DateTime.now().millisecondsSinceEpoch}';
         await downloader.extract(archive, extractDir);
