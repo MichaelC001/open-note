@@ -102,6 +102,7 @@ class MediaImportProvider extends ChangeNotifier {
       _busy ||
       toolDownloading.values.any((v) => v) ||
       toolInstalling.values.any((v) => v) ||
+      toolUninstalling.values.any((v) => v) ||
       toolFinishing.values.any((v) => v) ||
       modelDownloading ||
       modelDeleting;
@@ -184,6 +185,11 @@ class MediaImportProvider extends ChangeNotifier {
         return;
       }
       for (final kind in MediaToolKind.values) {
+        if ((toolDownloading[kind] ?? false) ||
+            (toolInstalling[kind] ?? false) ||
+            (toolUninstalling[kind] ?? false)) {
+          continue;
+        }
         final st = toolStatuses[kind];
         if (st == null ||
             !st.ready ||

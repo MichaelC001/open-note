@@ -367,6 +367,30 @@ void main() {
       expect(p.toolUninstalling[MediaToolKind.whisperCli] ?? false, isFalse);
     });
 
+    test('uninstallTool 进行中 operationInProgress 为 true', () async {
+      final tools = _GatedCheckToolService(() async => tmp.path);
+      final p = MediaImportProvider(
+        toolService: tools,
+        modelService: _AllModelsService(() async => tmp.path),
+      );
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+      tools.checkGate = Completer<void>();
+
+      final run = p.uninstallTool(MediaToolKind.ffmpeg);
+      for (var i = 0;
+          i < 100 && !(p.toolUninstalling[MediaToolKind.ffmpeg] ?? false);
+          i++) {
+        await Future.delayed(const Duration(milliseconds: 5));
+      }
+      expect(p.toolUninstalling[MediaToolKind.ffmpeg] ?? false, isTrue);
+      expect(p.operationInProgress, isTrue);
+
+      tools.checkGate!.complete();
+      await run;
+      expect(p.toolUninstalling[MediaToolKind.ffmpeg] ?? false, isFalse);
+      expect(p.operationInProgress, isFalse);
+    });
+
     test('systemPath：mac 调 brew uninstall，失败写 errorMessage', () async {
       String? capturedExe; List<String>? capturedArgs;
       final sysTool = _SystemToolService(() async => tmp.path);
@@ -488,6 +512,32 @@ void main() {
 
       expect(p.updateAvailableVersion[MediaToolKind.ffmpeg], isNull);
     });
+
+    test('下载进行中时检查跳过该 kind：fetch 返回也不写回更新徽标', () async {
+      final fetcher = _GatedFetcher();
+      final fake = _HangingDownloader();
+      final p = MediaImportProvider(
+        toolService: _MixedSourceToolService(() async => tmp.path),
+        modelService: _AllModelsService(() async => tmp.path),
+        downloader: fake,
+        updateService: ToolUpdateService(fetcher: fetcher.call),
+        clock: () => DateTime(2026, 1, 1, 12),
+      );
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+
+      final run = p.downloadTool(MediaToolKind.ffmpeg);
+      await fake.started.future;
+      expect(p.toolDownloading[MediaToolKind.ffmpeg] ?? false, isTrue);
+
+      final check = p.checkToolUpdates();
+      fetcher.gate.complete();
+      await check;
+
+      fake.release.complete();
+      await run;
+
+      expect(p.updateAvailableVersion[MediaToolKind.ffmpeg], isNull);
+    });
   });
 }
 
@@ -501,6 +551,19 @@ class _CountingFetcher {
     urls.add(url);
     return Response<dynamic>(
       data: {'tag_name': tag},
+      requestOptions: RequestOptions(path: url),
+    );
+  }
+}
+
+class _GatedFetcher {
+  final Completer<void> gate = Completer<void>();
+  int calls = 0;
+  Future<Response<dynamic>> call(String url, Options options) async {
+    calls++;
+    await gate.future;
+    return Response<dynamic>(
+      data: const {'tag_name': 'b7.0'},
       requestOptions: RequestOptions(path: url),
     );
   }
