@@ -1778,7 +1778,6 @@ class TranslationsEn extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get media_confirm_model => 'Model';
 	@override String get media_confirm_language => 'Language';
 	@override String get media_confirm_auto => 'Auto detect';
-	@override String media_confirm_disk({required Object sizeMb}) => 'About \$${sizeMb} MB of disk space required';
 	@override String get media_confirm_start => 'Start';
 	@override String get media_proc_prepare => 'Preparing…';
 	@override String get media_proc_acquire => 'Downloading media…';

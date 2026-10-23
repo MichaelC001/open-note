@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:open_note/l10n/strings.g.dart';
 import 'package:open_note/providers/media_import_provider.dart';
 import 'package:open_note/services/media/media_downloader.dart';
+import 'package:open_note/services/media/media_import_service.dart';
 import 'package:open_note/services/media/media_tool_service.dart';
 import 'package:open_note/services/media/whisper_model_service.dart';
 import 'package:open_note/widgets/media_import/media_import_dialog.dart';
@@ -250,6 +251,53 @@ void main() {
       await tester.pumpAndSettle();
       expect(provider.selectedTier, WhisperModelTier.base);
       expect(provider.environmentReady, isFalse);
+    });
+
+    testWidgets('confirm 步骤不再显示磁盘空间预估文案', (tester) async {
+      final provider = makeProvider();
+      await pumpDialogWith(tester, provider);
+      await provider.startForFile(File('/tmp/demo.mp4'));
+      await tester.pumpAndSettle();
+      provider.gotoConfirm();
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('磁盘空间'), findsNothing);
+    });
+
+    testWidgets('structured 档 AI 格式化失败：完成页显示未完成提示', (tester) async {
+      final provider = makeProvider();
+      await pumpDialogWith(tester, provider);
+      await provider.confirmAndStart(
+        runOverride: (_, _) async => const MediaImportResult(
+          markdown: '# raw',
+          title: 'T',
+          formattedByAI: false,
+        ),
+        saveNote: (_) async => 'note-1',
+      );
+      await tester.pumpAndSettle();
+
+      expect(provider.step, MediaImportStep.done);
+      expect(find.text('AI 格式化未完成，已保存原始转录文本'), findsOneWidget);
+    });
+
+    testWidgets('raw 档（预期不格式化）完成页不显示未完成提示', (tester) async {
+      SharedPreferences.setMockInitialValues(
+          <String, Object>{'media_import_polish_level': 'raw'});
+      final provider = makeProvider();
+      await pumpDialogWith(tester, provider);
+      await provider.confirmAndStart(
+        runOverride: (_, _) async => const MediaImportResult(
+          markdown: '# raw',
+          title: 'T',
+          formattedByAI: false,
+        ),
+        saveNote: (_) async => 'note-1',
+      );
+      await tester.pumpAndSettle();
+
+      expect(provider.step, MediaImportStep.done);
+      expect(find.text('AI 格式化未完成，已保存原始转录文本'), findsNothing);
     });
 
     testWidgets('关闭向导后状态重置回 source 步，可重新填写', (tester) async {

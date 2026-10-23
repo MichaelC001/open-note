@@ -24,7 +24,6 @@ class _ConfirmStepState extends State<ConfirmStep> {
     final t = Translations.of(context);
     final p = context.watch<MediaImportProvider>();
     final info = WhisperModelService.infoFor(p.selectedTier);
-    final sizeMb = (info.downloadSizeBytes / 1024 / 1024).round();
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -65,8 +64,6 @@ class _ConfirmStepState extends State<ConfirmStep> {
             onChanged: (v) => setState(() => _language = v ?? 'auto'),
           ),
         ),
-        Text(t.media_confirm_disk(sizeMb: sizeMb),
-            style: Theme.of(context).textTheme.bodySmall),
         const SizedBox(height: 12),
         FilledButton.icon(
           onPressed: p.busy || widget.saveNote == null

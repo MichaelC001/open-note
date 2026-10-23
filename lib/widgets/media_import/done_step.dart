@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../l10n/strings.g.dart';
 import '../../providers/media_import_provider.dart';
+import '../../services/media/transcript_formatter.dart';
 
 class DoneStep extends StatelessWidget {
   final void Function(String noteId)? onOpenNote;
@@ -22,7 +23,10 @@ class DoneStep extends StatelessWidget {
         const Icon(Icons.check_circle, size: 48, color: Colors.green),
         const SizedBox(height: 12),
         Center(child: Text(r?.title ?? '')),
-        if (r?.formattedByAI == false)
+        // raw 档本就不调用 AI，无「未完成」可言；structured/organized 档
+        // AI 失败走兜底原文时仍需提示
+        if (r?.formattedByAI == false &&
+            p.donePolishLevel != ContentPolishLevel.raw)
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Center(

@@ -1772,7 +1772,6 @@ class TranslationsRu extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get media_confirm_model => 'Модель';
 	@override String get media_confirm_language => 'Язык';
 	@override String get media_confirm_auto => 'Автоопределение';
-	@override String media_confirm_disk({required Object sizeMb}) => 'Потребуется около \$${sizeMb} МБ на диске';
 	@override String get media_confirm_start => 'Начать';
 	@override String get media_proc_prepare => 'Подготовка…';
 	@override String get media_proc_acquire => 'Скачивание медиа…';

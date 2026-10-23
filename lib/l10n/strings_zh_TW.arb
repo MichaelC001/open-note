@@ -2327,8 +2327,6 @@
   "media_confirm_model": "辨識模型",
   "media_confirm_language": "辨識語言",
   "media_confirm_auto": "自動偵測",
-  "media_confirm_disk": "預計需 ${sizeMb} MB 磁碟空間",
-  "@media_confirm_disk": { "parameters": { "sizeMb": "int" } },
   "media_confirm_start": "開始轉換",
   "media_proc_prepare": "準備中…",
   "media_proc_acquire": "下載媒體中…",

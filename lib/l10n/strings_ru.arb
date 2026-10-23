@@ -2327,8 +2327,6 @@
   "media_confirm_model": "Модель",
   "media_confirm_language": "Язык",
   "media_confirm_auto": "Автоопределение",
-  "media_confirm_disk": "Потребуется около ${sizeMb} МБ на диске",
-  "@media_confirm_disk": { "parameters": { "sizeMb": "int" } },
   "media_confirm_start": "Начать",
   "media_proc_prepare": "Подготовка…",
   "media_proc_acquire": "Скачивание медиа…",

@@ -632,6 +632,149 @@ void main() {
       });
     });
   });
+
+  group('环境就绪跳过检测步骤', () {
+    void seedAllReady(MediaImportProvider p, {bool withModel = true}) {
+      for (final k in MediaToolKind.values) {
+        p.toolStatuses[k] = MediaToolStatus(
+          kind: k,
+          ready: true,
+          path: 'fake',
+          version: '1',
+          source: MediaToolSource.appManaged,
+        );
+      }
+      if (withModel) p.downloadedTiers.add(p.selectedTier);
+    }
+
+    test('工具与模型全就绪：startForUrl 直达 confirm 并后台刷新检测', () async {
+      final tools = _ReadyToolService(() async => tmp.path);
+      final p = MediaImportProvider(
+        toolService: tools,
+        modelService: _AllModelsService(() async => tmp.path),
+      );
+      seedAllReady(p);
+      final before = tools.checkCount;
+
+      await p.startForUrl('https://example.com/v');
+
+      expect(p.step, MediaImportStep.confirm);
+      // 后台静默刷新确实执行了检测（验证缓存使其廉价）
+      expect(tools.checkCount, greaterThan(before));
+    });
+
+    test('工具就绪：startForFile 直达 confirm', () async {
+      final p = makeProvider();
+      seedAllReady(p);
+
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+
+      expect(p.step, MediaImportStep.confirm);
+    });
+
+    test('缺模型：仍走 envCheck 完整检测', () async {
+      final p = makeProvider();
+      seedAllReady(p, withModel: false);
+
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+
+      expect(p.step, MediaImportStep.envCheck);
+      expect(p.environmentReady, isTrue); // 检测完成后模型就绪
+    });
+  });
+
+  group('更新标记持久化（跨重启恢复 + 落盘）', () {
+    MediaImportProvider makeUpdateProvider(_CountingFetcher fetcher) =>
+        MediaImportProvider(
+          toolService: _MixedSourceToolService(() async => tmp.path),
+          modelService: _AllModelsService(() async => tmp.path),
+          updateService: ToolUpdateService(fetcher: fetcher.call),
+          clock: () => DateTime(2026, 1, 1, 12),
+        );
+
+    Future<void> flushRestore() async {
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+    }
+
+    test('构造后从持久化恢复更新标记，非法 kind 跳过', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'media_tool_update_available': '{"ffmpeg":"b7.0","bogus":"x"}',
+      });
+      final p = makeUpdateProvider(_CountingFetcher('b7.0'));
+      await flushRestore();
+      expect(p.updateAvailableVersion[MediaToolKind.ffmpeg], 'b7.0');
+      expect(p.updateAvailableVersion.length, 1);
+    });
+
+    test('checkToolUpdates 发现更新：内存与持久化表都写入', () async {
+      final fetcher = _CountingFetcher('b7.0');
+      final p = makeUpdateProvider(fetcher);
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+
+      await p.checkToolUpdates();
+
+      expect(p.updateAvailableVersion[MediaToolKind.ffmpeg], 'b7.0');
+      expect(await MediaImportSettings().readUpdateAvailable(),
+          {'ffmpeg': 'b7.0'});
+    });
+
+    test('checkToolUpdates 无更新：清除该 kind 的持久化标记', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'media_tool_update_available': '{"ffmpeg":"b7.0"}',
+      });
+      final fetcher = _CountingFetcher('b6.0'); // == 本地版本 → 无更新
+      final p = makeUpdateProvider(fetcher);
+      await flushRestore();
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+
+      await p.checkToolUpdates();
+
+      expect(p.updateAvailableVersion[MediaToolKind.ffmpeg], isNull);
+      expect(await MediaImportSettings().readUpdateAvailable(), isEmpty);
+    });
+
+    test('downloadTool 成功后从持久化表移除该 kind', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'media_tool_update_available': '{"ffmpeg":"b6.1.1"}',
+      });
+      final p = MediaImportProvider(
+        toolService: _ReadyToolService(() async => tmp.path),
+        modelService: _AllModelsService(() async => tmp.path),
+        downloader: _CapturingDownloader(),
+      );
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+      await flushRestore();
+      expect(p.updateAvailableVersion[MediaToolKind.ffmpeg], 'b6.1.1');
+
+      await p.downloadTool(MediaToolKind.ffmpeg);
+
+      expect(p.errorMessage, isNull);
+      expect(p.updateAvailableVersion[MediaToolKind.ffmpeg], isNull);
+      expect(await MediaImportSettings().readUpdateAvailable(), isEmpty);
+    });
+
+    test('uninstallTool 成功后从持久化表移除该 kind', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'media_tool_update_available': '{"whisperCli":"b1.2.3"}',
+      });
+      final tools = _ReadyToolService(() async => tmp.path);
+      final p = MediaImportProvider(
+        toolService: tools,
+        modelService: _AllModelsService(() async => tmp.path),
+      );
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+      await flushRestore();
+      final bin = File(
+          '${await tools.toolDir(MediaToolKind.whisperCli)}/${tools.binaryName(MediaToolKind.whisperCli)}');
+      await bin.create(recursive: true);
+
+      await p.uninstallTool(MediaToolKind.whisperCli);
+
+      expect(p.errorMessage, isNull);
+      expect(p.updateAvailableVersion[MediaToolKind.whisperCli], isNull);
+      expect(await MediaImportSettings().readUpdateAvailable(), isEmpty);
+    });
+  });
 }
 
 class _CountingFetcher {

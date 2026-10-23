@@ -2335,8 +2335,6 @@
   "media_confirm_model": "识别模型",
   "media_confirm_language": "识别语言",
   "media_confirm_auto": "自动检测",
-  "media_confirm_disk": "预计需 ${sizeMb} MB 磁盘空间",
-  "@media_confirm_disk": { "parameters": { "sizeMb": "int" } },
   "media_confirm_start": "开始转换",
   "media_proc_prepare": "准备中…",
   "media_proc_acquire": "下载媒体中…",

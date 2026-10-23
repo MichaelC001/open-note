@@ -1772,7 +1772,6 @@ class TranslationsZhTw extends Translations with BaseTranslations<AppLocale, Tra
 	@override String get media_confirm_model => '辨識模型';
 	@override String get media_confirm_language => '辨識語言';
 	@override String get media_confirm_auto => '自動偵測';
-	@override String media_confirm_disk({required Object sizeMb}) => '預計需 \$${sizeMb} MB 磁碟空間';
 	@override String get media_confirm_start => '開始轉換';
 	@override String get media_proc_prepare => '準備中…';
 	@override String get media_proc_acquire => '下載媒體中…';

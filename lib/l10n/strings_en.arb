@@ -2335,8 +2335,6 @@
   "media_confirm_model": "Model",
   "media_confirm_language": "Language",
   "media_confirm_auto": "Auto detect",
-  "media_confirm_disk": "About ${sizeMb} MB of disk space required",
-  "@media_confirm_disk": { "parameters": { "sizeMb": "int" } },
   "media_confirm_start": "Start",
   "media_proc_prepare": "Preparing…",
   "media_proc_acquire": "Downloading media…",

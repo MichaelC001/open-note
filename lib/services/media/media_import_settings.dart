@@ -15,6 +15,7 @@ class MediaImportSettings {
   static const _kVerifyCache = 'media_tool_verify_cache';
   static const _kLastUpdateCheckAt = 'media_tool_last_update_check_at';
   static const _kWhisperSourceTag = 'media_tool_whisper_cli_source_tag';
+  static const _kUpdateAvailable = 'media_tool_update_available';
 
   /// 工具验证缓存（kind -> JSON 条目），避免每次检测 spawn 慢二进制。
   Future<Map<String, String>> readVerifyCache() async {
@@ -106,6 +107,31 @@ class MediaImportSettings {
       await prefs.remove(_kWhisperSourceTag);
     } else {
       await prefs.setString(_kWhisperSourceTag, tag);
+    }
+  }
+
+  /// 持久化的工具新版本标记（kindName -> release tag），跨重启恢复徽标。
+  Future<Map<String, String>> readUpdateAvailable() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kUpdateAvailable);
+    if (raw == null) return {};
+    try {
+      return Map<String, String>.from(jsonDecode(raw) as Map);
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> writeUpdateAvailable(Map<String, String> table) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (table.isEmpty) {
+        await prefs.remove(_kUpdateAvailable);
+      } else {
+        await prefs.setString(_kUpdateAvailable, jsonEncode(table));
+      }
+    } catch (_) {
+      // 持久化失败静默：徽标是辅助信息，不阻塞主流程
     }
   }
 }

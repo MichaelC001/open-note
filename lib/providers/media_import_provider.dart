@@ -46,8 +46,11 @@ class MediaImportProvider extends ChangeNotifier {
        downloader = downloader ?? MediaDownloader(),
        installerRunner = installerRunner ?? _defaultInstallerRunner,
        brewPathResolver = brewPathResolver ?? _defaultBrewPathResolver,
-       updateService = updateService ?? ToolUpdateService(),
-       clock = clock ?? DateTime.now;
+        updateService = updateService ?? ToolUpdateService(),
+        clock = clock ?? DateTime.now {
+    // fire-and-forget：从持久化恢复「可更新」徽标（跨重启不丢，见 checkToolUpdates）
+    unawaited(_restoreUpdateAvailable());
+  }
 
   /// 默认工具服务：接 SharedPreferences 验证缓存（yt-dlp 等 spawn 慢的二进制免重复验证）。
   static MediaToolService _defaultToolService() {
@@ -91,6 +94,10 @@ class MediaImportProvider extends ChangeNotifier {
   MediaImportResult? result;
   String? resultNoteId;
 
+  /// 当次转换实际使用的内容优化档（confirmAndStart 时捕获）。
+  /// raw 档不调用 AI，完成页不应显示「AI 格式化未完成」。
+  ContentPolishLevel donePolishLevel = ContentPolishLevel.structured;
+
   CancelToken? _downloadCancel;
   Process? _activeInstaller;
   MediaImportService? _activeService;
@@ -122,10 +129,48 @@ class MediaImportProvider extends ChangeNotifier {
 
   void _notify() => notifyListeners();
 
+  /// 构造后恢复持久化的更新标记（kindName 反序列化，非法 kind/值跳过）。
+  Future<void> _restoreUpdateAvailable() async {
+    try {
+      final table = await settings.readUpdateAvailable();
+      if (table.isEmpty) return;
+      for (final entry in table.entries) {
+        try {
+          final kind = MediaToolKind.values.byName(entry.key);
+          updateAvailableVersion.putIfAbsent(kind, () => entry.value);
+        } catch (_) {
+          // 未知 kind（枚举演进/脏数据）：跳过
+        }
+      }
+      _notify();
+    } catch (_) {
+      // 恢复失败静默：下次检查会重建
+    }
+  }
+
+  /// 将内存徽标整表落盘（与已存内容一致时跳过写入）。
+  Future<void> _persistUpdateAvailable() async {
+    try {
+      final table = <String, String>{
+        for (final e in updateAvailableVersion.entries)
+          if (e.value != null) e.key.name: e.value!,
+      };
+      final stored = await settings.readUpdateAvailable();
+      if (stored.length == table.length &&
+          stored.entries.every((e) => table[e.key] == e.value)) {
+        return;
+      }
+      await settings.writeUpdateAvailable(table);
+    } catch (_) {
+      // 持久化失败静默
+    }
+  }
+
   Future<void> startForUrl(String url) async {
     sourceKind = ImportSourceKind.url;
     urlInput = url;
     pickedFile = null;
+    if (_enterConfirmIfReady()) return;
     step = MediaImportStep.envCheck;
     _notify();
     await checkEnvironment();
@@ -134,9 +179,20 @@ class MediaImportProvider extends ChangeNotifier {
   Future<void> startForFile(File f) async {
     sourceKind = ImportSourceKind.file;
     pickedFile = f;
+    if (_enterConfirmIfReady()) return;
     step = MediaImportStep.envCheck;
     _notify();
     await checkEnvironment();
+  }
+
+  /// 环境已就绪（工具全 ready && 所选模型已下载）时跳过检测步骤直达确认页，
+  /// 检测转为后台静默刷新（验证缓存使其近乎零成本）。
+  bool _enterConfirmIfReady() {
+    if (!environmentReady) return false;
+    step = MediaImportStep.confirm;
+    _notify();
+    unawaited(checkEnvironment());
+    return true;
   }
 
   Future<void> checkEnvironment({bool forceVerify = false}) async {
@@ -193,6 +249,7 @@ class MediaImportProvider extends ChangeNotifier {
       // 本轮至少实际 fetch 过一个 kind 才写 24h 节流时间戳：
       // 全部被跳过（无状态/非 appManaged/操作占用）时空转不烧节流预算
       var fetchedKinds = 0;
+      var updateTableChanged = false;
       for (final kind in MediaToolKind.values) {
         if ((toolDownloading[kind] ?? false) ||
             (toolInstalling[kind] ?? false) ||
@@ -220,7 +277,13 @@ class MediaImportProvider extends ChangeNotifier {
               kind: kind,
               storedSourceTag: stored,
             )) {
-              updateAvailableVersion[kind] = latest;
+              if (updateAvailableVersion[kind] != latest) {
+                updateAvailableVersion[kind] = latest;
+                updateTableChanged = true;
+              }
+            } else if (updateAvailableVersion.remove(kind) != null) {
+              // 拉到最新且无更新：清掉过期徽标
+              updateTableChanged = true;
             }
           }
         } catch (_) {
@@ -232,6 +295,9 @@ class MediaImportProvider extends ChangeNotifier {
       }
       if (fetchedKinds > 0) {
         await settings.setLastUpdateCheckAt(clock());
+      }
+      if (updateTableChanged) {
+        await _persistUpdateAvailable();
       }
     } catch (_) {
       // 更新检查绝不影响主流程
@@ -254,8 +320,7 @@ class MediaImportProvider extends ChangeNotifier {
       return;
     }
     // 先取检测到的更新 tag 再清徽标：ffmpeg「更新」按该具体 tag 下载
-    final updateTag = updateAvailableVersion[kind];
-    updateAvailableVersion[kind] = null;
+    final updateTag = updateAvailableVersion.remove(kind);
     toolDownloading[kind] = true;
     toolDownloadStatus[kind] = const DownloadStatus();
     _downloadTrackers['tool:${kind.name}'] = DownloadSpeedTracker();
@@ -343,6 +408,9 @@ class MediaImportProvider extends ChangeNotifier {
       if (!(toolStatuses[kind]?.ready ?? false)) {
         errorMessage = '工具安装后校验未通过';
         errorDetail = null;
+      } else {
+        // 更新/下载安装成功：徽标已清，同步落盘（下次启动不再误报）
+        await _persistUpdateAvailable();
       }
     } catch (e) {
       errorMessage = '工具下载/安装失败';
@@ -460,6 +528,9 @@ class MediaImportProvider extends ChangeNotifier {
       }
       toolStatuses[kind] =
           await toolService.check(kind, forceVerify: true);
+      // 卸载成功：清徽标并落盘（旧版本已不存在，更新提示失效）
+      updateAvailableVersion.remove(kind);
+      await _persistUpdateAvailable();
     } catch (e) {
       errorMessage = '卸载失败';
       errorDetail = e.toString();
@@ -649,6 +720,7 @@ class MediaImportProvider extends ChangeNotifier {
     final formatter = hasAI ? TranscriptFormatter(callAI!) : null;
     final includeTs = await settings.includeTimestamps();
     final polish = await settings.polishLevel();
+    donePolishLevel = polish;
     final service = MediaImportService(
       toolService: toolService,
       modelService: modelService,

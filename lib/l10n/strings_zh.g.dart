@@ -2964,9 +2964,6 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 	/// zh: '自动检测'
 	String get media_confirm_auto => '自动检测';
 
-	/// zh: '预计需 ${sizeMb} MB 磁盘空间'
-	String media_confirm_disk({required Object sizeMb}) => '预计需 \$${sizeMb} MB 磁盘空间';
-
 	/// zh: '开始转换'
 	String get media_confirm_start => '开始转换';
 

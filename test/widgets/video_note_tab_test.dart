@@ -345,6 +345,32 @@ void main() {
     ]);
   });
 
+  testWidgets('源媒体路径随删除源开关动态切换（tmp/media 目录）', (tester) async {
+    tester.view.physicalSize = const Size(1280, 1100);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final provider = makeProvider(toolsReady: true);
+    await pumpTab(tester, provider);
+    await tester.pumpAndSettle();
+
+    // 默认删除源=开 → 源媒体随任务删除，展示临时目录
+    expect(find.textContaining('media_import_tmp'), findsOneWidget);
+    expect(find.textContaining('media_import_media'), findsNothing);
+
+    // 关 → 保留副本目录
+    await tester.tap(find.text('完成后删除下载的源媒体'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('media_import_media'), findsOneWidget);
+    expect(find.textContaining('media_import_tmp'), findsNothing);
+
+    // 重新开 → 切回临时目录
+    await tester.tap(find.text('完成后删除下载的源媒体'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('media_import_tmp'), findsOneWidget);
+    expect(find.textContaining('media_import_media'), findsNothing);
+  });
+
   testWidgets('源媒体路径行显示并可复制', (tester) async {
     // 卡片新增时间戳开关与优化强度滑块后变高，900 视口令路径行落出视口不可点
     tester.view.physicalSize = const Size(1280, 1100);

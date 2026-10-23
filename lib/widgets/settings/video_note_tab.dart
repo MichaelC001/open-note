@@ -34,9 +34,10 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
   bool _loaded = false;
   late final Future<String> _modelsDirFuture =
       widget.modelService.modelsDir();
-  late final Future<String> _sourceMediaDirFuture =
-      widget.modelService.resolveBaseDir()
-          .then((dir) => '$dir/media_import_tmp');
+  // 源媒体目录基路径缓存一次；子目录随「完成后删除源媒体」开关动态切换：
+  // 开=随任务删除（media_import_tmp），关=保留副本（media_import_media）
+  late final Future<String> _sourceMediaBaseDirFuture =
+      widget.modelService.resolveBaseDir();
 
   @override
   void initState() {
@@ -191,9 +192,13 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
               },
             ),
             FutureBuilder<String>(
-              future: _sourceMediaDirFuture,
+              future: _sourceMediaBaseDirFuture,
               builder: (context, snap) {
-                final dir = snap.data ?? '';
+                final base = snap.data ?? '';
+                final dir = base.isEmpty
+                    ? ''
+                    : '$base/'
+                        '${_deleteSource ? 'media_import_tmp' : 'media_import_media'}';
                 return Row(children: [
                   const Icon(Icons.folder_open,
                       size: 16, color: DesignTokens.gray500),
