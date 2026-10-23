@@ -96,6 +96,53 @@ void main() {
     expect(Directory('${tmp.path}/media_import_tmp').listSync(), isEmpty);
   });
 
+  test('raw 档全链路不调用 AI（含标题生成），formattedByAI=false，标题来自文件名', () async {
+    final src = File('${tmp.path}/rawsrc.wav');
+    src.writeAsBytesSync(List<int>.filled(44 + 32000, 0));
+
+    var aiCalls = 0;
+    final svc = MediaImportService(
+      resolveBaseDir: () async => tmp.path,
+      toolService: _FakeToolService(() async => tmp.path),
+      modelService: _FakeModelService(() async => tmp.path),
+      whisperRunner: _FakeWhisperRunner(),
+      formatter: TranscriptFormatter((prompt) async {
+        aiCalls++;
+        return '# AI 标题\n\n## 00:00:00 章节';
+      }),
+    );
+    final result = await svc.run(
+      MediaImportRequest(localFile: src, tier: WhisperModelTier.base),
+      includeTimestamps: true,
+      polishLevel: ContentPolishLevel.raw,
+    );
+    expect(aiCalls, 0);
+    expect(result.formattedByAI, isFalse);
+    expect(result.title, 'rawsrc');
+    expect(result.markdown, contains('# 转录笔记'));
+    expect(result.markdown, isNot(contains('AI 标题')));
+  });
+
+  test('organized 档 AI 调用失败降级：formattedByAI=false 且标题来自文件名', () async {
+    final src = File('${tmp.path}/failing.wav');
+    src.writeAsBytesSync(List<int>.filled(44 + 32000, 0));
+    final svc = MediaImportService(
+      resolveBaseDir: () async => tmp.path,
+      toolService: _FakeToolService(() async => tmp.path),
+      modelService: _FakeModelService(() async => tmp.path),
+      whisperRunner: _FakeWhisperRunner(),
+      formatter: TranscriptFormatter((prompt) async => throw StateError('AI 挂了')),
+    );
+    final result = await svc.run(
+      MediaImportRequest(localFile: src, tier: WhisperModelTier.base),
+      includeTimestamps: true,
+      polishLevel: ContentPolishLevel.organized,
+    );
+    expect(result.formattedByAI, isFalse);
+    expect(result.title, 'failing');
+    expect(result.markdown, contains('# 转录笔记'));
+  });
+
   test('formatter 为 null 时降级 fallbackMarkdown', () async {
     final src = File('${tmp.path}/src2.wav');
     src.writeAsBytesSync(List<int>.filled(44 + 32000, 0));

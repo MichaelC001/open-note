@@ -139,8 +139,8 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
                   ? 'assets/svg/engine-ribbon-dark.svg'
                   : 'assets/svg/engine-ribbon-light.svg',
             ),
-            const SizedBox(height: 16),
-            _card(isDark, [
+          const SizedBox(height: 16),
+          _card(isDark, [
             Text(
               t.media_settings_title,
               style: TextStyle(

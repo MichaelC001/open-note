@@ -175,9 +175,10 @@ class MediaImportService {
 
       onProgress?.call(MediaImportPhase.formatting, null);
       String markdown;
+      final hasAI = formatter != null && polishLevel != ContentPolishLevel.raw;
       var ai = false;
       try {
-        if (formatter == null) {
+        if (!hasAI) {
           throw const MediaImportException('AI 未配置');
         }
         markdown = await formatter!.format(
