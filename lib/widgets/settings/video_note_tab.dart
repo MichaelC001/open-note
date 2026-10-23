@@ -190,6 +190,35 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
                 setState(() => _deleteSource = v);
               },
             ),
+            FutureBuilder<String>(
+              future: _sourceMediaDirFuture,
+              builder: (context, snap) {
+                final dir = snap.data ?? '';
+                return Row(children: [
+                  const Icon(Icons.folder_open,
+                      size: 16, color: DesignTokens.gray500),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(dir,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 11, color: DesignTokens.gray500)),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.copy, size: 16),
+                    tooltip: t.media_settings_copyPath,
+                    onPressed: dir.isEmpty
+                        ? null
+                        : () {
+                            Clipboard.setData(ClipboardData(text: dir));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                    content: Text(t.media_env_copied)));
+                          },
+                  ),
+                ]);
+              },
+            ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               dense: true,
@@ -225,34 +254,10 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
                 },
               ),
             ),
-            FutureBuilder<String>(
-              future: _sourceMediaDirFuture,
-              builder: (context, snap) {
-                final dir = snap.data ?? '';
-                return Row(children: [
-                  const Icon(Icons.folder_open,
-                      size: 16, color: DesignTokens.gray500),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(dir,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 11, color: DesignTokens.gray500)),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.copy, size: 16),
-                    tooltip: t.media_settings_copyPath,
-                    onPressed: dir.isEmpty
-                        ? null
-                        : () {
-                            Clipboard.setData(ClipboardData(text: dir));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                    content: Text(t.media_env_copied)));
-                          },
-                  ),
-                ]);
-              },
+            Text(
+              _polishDesc(t),
+              style: const TextStyle(
+                  fontSize: 11, color: DesignTokens.gray500),
             ),
           ]),
         ],
@@ -264,6 +269,12 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
         ContentPolishLevel.raw => t.media_polish_raw,
         ContentPolishLevel.structured => t.media_polish_structured,
         ContentPolishLevel.organized => t.media_polish_organized,
+      };
+
+  String _polishDesc(Translations t) => switch (_polish) {
+        ContentPolishLevel.raw => t.media_polish_desc_raw,
+        ContentPolishLevel.structured => t.media_polish_desc_structured,
+        ContentPolishLevel.organized => t.media_polish_desc_organized,
       };
 
   Widget _toolRow(BuildContext context, MediaImportProvider p, Translations t,
@@ -359,7 +370,7 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
       children: children,
     );
     return Container(
-      padding: const EdgeInsets.all(16),
+      clipBehavior: Clip.antiAlias,
       width: double.infinity,
       decoration: BoxDecoration(
         color: isDark ? DesignTokens.darkSurface : Colors.white,
@@ -369,17 +380,25 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
           width: 1,
         ),
       ),
-      // ribbonAsset：左上角主题装饰图，画在卡片背景之上、内容之下
+      // ribbonAsset：顶部主题装饰图，顶满卡片宽度、贴卡片顶边（y=0），
+      // 圆角由容器 Clip.antiAlias 裁剪；内容层 Padding(16) 浮上
       child: ribbonAsset == null
-          ? content
+          ? Padding(
+              padding: const EdgeInsets.all(16),
+              child: content,
+            )
           : Stack(
               children: [
                 Positioned(
                   top: 0,
                   left: 0,
-                  child: SvgPicture.asset(ribbonAsset, width: 180),
+                  right: 0,
+                  child: SvgPicture.asset(ribbonAsset, fit: BoxFit.fitWidth),
                 ),
-                content,
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: content,
+                ),
               ],
             ),
     );

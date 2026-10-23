@@ -1791,7 +1791,7 @@ class TranslationsEn extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get media_done_open => 'Open note';
 	@override String get media_done_again => 'Convert another';
 	@override String get media_settings_title => 'Video to Note';
-	@override String get media_settings_source => 'Download source';
+	@override String get media_settings_source => 'Engine source';
 	@override String get media_settings_sourceAuto => 'Direct first';
 	@override String get media_settings_sourceDirect => 'Direct only';
 	@override String get media_settings_sourceMirror => 'Recommended (mirror first)';
@@ -1820,6 +1820,9 @@ class TranslationsEn extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get media_polish_raw => 'Verbatim transcript';
 	@override String get media_polish_structured => 'Structure only';
 	@override String get media_polish_organized => 'Full organize';
+	@override String get media_polish_desc_raw => 'Verbatim output, no AI';
+	@override String get media_polish_desc_structured => 'Split paragraphs only, no rewriting';
+	@override String get media_polish_desc_organized => 'Organize sections & reorder, no rewriting';
 	@override String get media_env_background => 'Download continues in the background. Check Settings → Video to Note for progress.';
 	@override String get media_env_uninstall => 'Uninstall';
 	@override String get media_env_finishing => 'Downloaded · Installing…';

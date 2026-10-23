@@ -278,6 +278,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
+        borderRadius: BorderRadius.circular(8),
         onTap: item.enabled
             ? () {
                 setState(() {

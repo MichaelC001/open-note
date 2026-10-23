@@ -2349,7 +2349,7 @@
   "media_done_open": "Open note",
   "media_done_again": "Convert another",
   "media_settings_title": "Video to Note",
-  "media_settings_source": "Download source",
+  "media_settings_source": "Engine source",
   "media_settings_sourceAuto": "Direct first",
   "media_settings_sourceDirect": "Direct only",
   "media_settings_sourceMirror": "Recommended (mirror first)",
@@ -2382,6 +2382,9 @@
   "media_polish_raw": "Verbatim transcript",
   "media_polish_structured": "Structure only",
   "media_polish_organized": "Full organize",
+  "media_polish_desc_raw": "Verbatim output, no AI",
+  "media_polish_desc_structured": "Split paragraphs only, no rewriting",
+  "media_polish_desc_organized": "Organize sections & reorder, no rewriting",
   "media_env_background":
       "Download continues in the background. Check Settings → Video to Note for progress.",
   "media_env_uninstall": "Uninstall",

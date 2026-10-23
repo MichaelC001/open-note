@@ -3003,8 +3003,8 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 	/// zh: '视频转笔记'
 	String get media_settings_title => '视频转笔记';
 
-	/// zh: '下载源'
-	String get media_settings_source => '下载源';
+	/// zh: '引擎源'
+	String get media_settings_source => '引擎源';
 
 	/// zh: '直连优先'
 	String get media_settings_sourceAuto => '直连优先';
@@ -3089,6 +3089,15 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 
 	/// zh: '内容整理'
 	String get media_polish_organized => '内容整理';
+
+	/// zh: '原文直出，不使用 AI'
+	String get media_polish_desc_raw => '原文直出，不使用 AI';
+
+	/// zh: '仅拆分段落，不改写内容'
+	String get media_polish_desc_structured => '仅拆分段落，不改写内容';
+
+	/// zh: '整理章节并重排，不改写原意'
+	String get media_polish_desc_organized => '整理章节并重排，不改写原意';
 
 	/// zh: '下载已在后台进行，可在 设置→视频转笔记 查看进度'
 	String get media_env_background => '下载已在后台进行，可在 设置→视频转笔记 查看进度';

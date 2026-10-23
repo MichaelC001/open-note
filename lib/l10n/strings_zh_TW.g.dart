@@ -1785,7 +1785,7 @@ class TranslationsZhTw extends Translations with BaseTranslations<AppLocale, Tra
 	@override String get media_done_open => '開啟筆記';
 	@override String get media_done_again => '再轉一個';
 	@override String get media_settings_title => '影片轉筆記';
-	@override String get media_settings_source => '下載來源';
+	@override String get media_settings_source => '引擎來源';
 	@override String get media_settings_sourceAuto => '直連優先';
 	@override String get media_settings_sourceDirect => '僅直連';
 	@override String get media_settings_sourceMirror => '推薦（鏡像優先）';
@@ -1814,6 +1814,9 @@ class TranslationsZhTw extends Translations with BaseTranslations<AppLocale, Tra
 	@override String get media_polish_raw => '逐字稿';
 	@override String get media_polish_structured => '結構格式化';
 	@override String get media_polish_organized => '內容整理';
+	@override String get media_polish_desc_raw => '原文直出，不使用 AI';
+	@override String get media_polish_desc_structured => '僅拆分段落，不改寫內容';
+	@override String get media_polish_desc_organized => '整理章節並重排，不改寫原意';
 	@override String get media_env_background => '下載已在背景進行，可在 設定→影片轉筆記 查看進度';
 	@override String get media_env_uninstall => '解除安裝';
 	@override String get media_env_finishing => '下載完成 · 安裝中…';

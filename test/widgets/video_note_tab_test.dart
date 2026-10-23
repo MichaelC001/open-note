@@ -190,18 +190,25 @@ void main() {
 
     expect(find.text('视频转笔记'), findsOneWidget);
     expect(find.text('下载源'), findsNothing);
+    expect(find.text('引擎源'), findsNothing);
 
     await tester.tap(find.text('视频转笔记'));
     await tester.pumpAndSettle();
 
-    expect(find.text('下载源'), findsOneWidget);
+    expect(find.text('引擎源'), findsOneWidget);
     expect(find.text('默认识别模型'), findsNothing);
     expect(find.text('完成后删除下载的源媒体'), findsOneWidget);
+
+    // 侧边栏导航项 hover 高亮与激活态同为 8 圆角
+    final navInk = tester.widget<InkWell>(find.ancestor(
+        of: find.text('视频转笔记'), matching: find.byType(InkWell)));
+    expect(navInk.borderRadius, BorderRadius.circular(8));
 
     // 回到首选项，确认分区已移出
     await tester.tap(find.text('首选项'));
     await tester.pumpAndSettle();
     expect(find.text('下载源'), findsNothing);
+    expect(find.text('引擎源'), findsNothing);
   });
 
   testWidgets('工具与模型区：就绪工具显示版本，模型三行全显', (tester) async {
@@ -225,6 +232,27 @@ void main() {
     await pumpTab(tester, provider);
     await tester.pumpAndSettle();
     expect(find.byType(SvgPicture), findsOneWidget);
+    // ribbon 顶满卡片宽度（1280 视口减页边距 16×2），而非固定 180
+    expect(tester.getSize(find.byType(SvgPicture)).width, greaterThan(600));
+  });
+
+  testWidgets('临时目录行位于删除源开关之后、关键时间戳之前', (tester) async {
+    tester.view.physicalSize = const Size(1280, 1100);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final provider = makeProvider(toolsReady: true);
+    await pumpTab(tester, provider);
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('media_import_tmp'), findsOneWidget);
+    final delSourceDy =
+        tester.getTopLeft(find.text('完成后删除下载的源媒体')).dy;
+    final tmpDirDy =
+        tester.getTopLeft(find.textContaining('media_import_tmp')).dy;
+    final tsDy = tester.getTopLeft(find.text('关键时间戳')).dy;
+    expect(delSourceDy, lessThan(tmpDirDy));
+    expect(tmpDirDy, lessThan(tsDy));
   });
 
   testWidgets('显示模型下载目录并可复制', (tester) async {
@@ -365,6 +393,8 @@ void main() {
         of: find.text('关键时间戳'), matching: find.byType(SwitchListTile)));
     expect(tsSwitch.value, isFalse);
     expect(find.text('结构格式化'), findsOneWidget);
+    // 默认档位描述行（structured）
+    expect(find.text('仅拆分段落，不改写内容'), findsOneWidget);
 
     // 开关切到开 → 持久化
     await tester.tap(find.text('关键时间戳'));
@@ -378,6 +408,9 @@ void main() {
         ContentPolishLevel.organized);
     expect(find.text('内容整理'), findsOneWidget);
     expect(find.text('结构格式化'), findsNothing);
+    // 描述行随档位切换
+    expect(find.text('整理章节并重排，不改写原意'), findsOneWidget);
+    expect(find.text('仅拆分段落，不改写内容'), findsNothing);
   });
 
   testWidgets('发现新版本显示可更新标记，点更新触发重新下载并清除标记',

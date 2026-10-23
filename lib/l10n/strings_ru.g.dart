@@ -1785,7 +1785,7 @@ class TranslationsRu extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get media_done_open => 'Открыть заметку';
 	@override String get media_done_again => 'Конвертировать ещё';
 	@override String get media_settings_title => 'Видео в заметку';
-	@override String get media_settings_source => 'Источник загрузки';
+	@override String get media_settings_source => 'Источник движков';
 	@override String get media_settings_sourceAuto => 'Сначала напрямую';
 	@override String get media_settings_sourceDirect => 'Только напрямую';
 	@override String get media_settings_sourceMirror => 'Рекомендуется (зеркало)';
@@ -1814,6 +1814,9 @@ class TranslationsRu extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get media_polish_raw => 'Дословная расшифровка';
 	@override String get media_polish_structured => 'Только структура';
 	@override String get media_polish_organized => 'Полная обработка';
+	@override String get media_polish_desc_raw => 'Дословно, без ИИ';
+	@override String get media_polish_desc_structured => 'Только разбивка на абзацы, без правки';
+	@override String get media_polish_desc_organized => 'Разделы и порядок, без изменения смысла';
 	@override String get media_env_background => 'Загрузка продолжается в фоне: Настройки → Видео в заметку.';
 	@override String get media_env_uninstall => 'Удалить';
 	@override String get media_env_finishing => 'Скачано · Установка…';
