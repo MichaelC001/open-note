@@ -1,4 +1,5 @@
 // lib/services/media/media_tool_service.dart
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
@@ -42,10 +43,17 @@ class MediaToolStatus {
 class MediaToolService {
   final Future<ProcessRunResult> Function(String, List<String>) run;
   final Future<String> Function() resolveBaseDir;
+  final Future<Map<String, String>?> Function()? cacheReader;
+  final Future<void> Function(Map<String, String> map)? cacheWriter;
+
+  final Map<String, String> _memoryCache = {};
+  bool _cacheLoaded = false;
 
   MediaToolService({
     Future<ProcessRunResult> Function(String, List<String>)? run,
     Future<String> Function()? resolveBaseDir,
+    this.cacheReader,
+    this.cacheWriter,
   })  : run = run ?? runCommand,
         resolveBaseDir = resolveBaseDir ?? _defaultBaseDir;
 
@@ -77,11 +85,25 @@ class MediaToolService {
     return await file.exists() ? file.path : null;
   }
 
-  Future<MediaToolStatus> check(MediaToolKind kind) async {
+  Future<MediaToolStatus> check(
+    MediaToolKind kind, {
+    bool forceVerify = false,
+  }) async {
     final appPath = await appManagedPath(kind);
+    if (!forceVerify) {
+      final cached = await _cachedStatus(kind);
+      if (cached != null &&
+          (appPath == cached.path ||
+              (appPath == null && await _whichPath(kind) == cached.path))) {
+        return cached;
+      }
+    }
     if (appPath != null) {
       final st = await _verify(kind, appPath, MediaToolSource.appManaged);
-      if (st != null) return st;
+      if (st != null) {
+        await _storeCache(kind, st);
+        return st;
+      }
     }
     final lookup = Platform.isWindows ? 'where' : 'which';
     final names = switch (kind) {
@@ -99,9 +121,88 @@ class MediaToolService {
           .trim();
       if (path.isEmpty) continue;
       final st = await _verify(kind, path, MediaToolSource.systemPath);
-      if (st != null) return st;
+      if (st != null) {
+        await _storeCache(kind, st);
+        return st;
+      }
     }
     return MediaToolStatus.missing(kind);
+  }
+
+  /// 验证结果缓存：key=kind，value=JSON(path/size/mtime/version/source)。
+  /// yt-dlp 等二进制单次 spawn 验证可达数秒，同一文件（大小+mtime 未变）直接复用结果。
+  Future<void> _ensureCacheLoaded() async {
+    if (_cacheLoaded) return;
+    _cacheLoaded = true;
+    if (cacheReader == null) return;
+    try {
+      final persisted = await cacheReader!();
+      if (persisted != null) _memoryCache.addAll(persisted);
+    } catch (_) {}
+  }
+
+  Future<MediaToolStatus?> _cachedStatus(MediaToolKind kind) async {
+    await _ensureCacheLoaded();
+    final raw = _memoryCache[kind.name];
+    if (raw == null) return null;
+    try {
+      final m = jsonDecode(raw) as Map<String, dynamic>;
+      final path = m['p'] as String;
+      final f = File(path);
+      if (!await f.exists()) return null;
+      if (await f.length() != (m['s'] as int)) return null;
+      if ((await f.lastModified()).millisecondsSinceEpoch !=
+          (m['m'] as int)) {
+        return null;
+      }
+      final source = (m['src'] as String?)?.isEmpty ?? true
+          ? null
+          : MediaToolSource.values.firstWhere((s) => s.name == m['src']);
+      return MediaToolStatus(
+        kind: kind,
+        ready: true,
+        path: path,
+        version: m['v'] as String?,
+        source: source,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _storeCache(MediaToolKind kind, MediaToolStatus st) async {
+    try {
+      final f = File(st.path!);
+      final entry = jsonEncode({
+        'p': st.path,
+        's': await f.length(),
+        'm': (await f.lastModified()).millisecondsSinceEpoch,
+        'v': st.version,
+        'src': st.source?.name ?? '',
+      });
+      _memoryCache[kind.name] = entry;
+      if (cacheWriter != null) await cacheWriter!(_memoryCache);
+    } catch (_) {}
+  }
+
+  Future<String?> _whichPath(MediaToolKind kind) async {
+    final lookup = Platform.isWindows ? 'where' : 'which';
+    final names = switch (kind) {
+      MediaToolKind.ffmpeg => ['ffmpeg'],
+      MediaToolKind.ytDlp => ['yt-dlp'],
+      MediaToolKind.whisperCli => ['whisper-cli', 'whispercpp', 'whisper.cpp'],
+    };
+    for (final name in names) {
+      final r = await run(lookup, [name]);
+      if (r.exitCode != 0) continue;
+      final path = r.stdout
+          .trim()
+          .split(RegExp(r'\r?\n'))
+          .firstWhere((l) => l.trim().isNotEmpty, orElse: () => '')
+          .trim();
+      if (path.isNotEmpty) return path;
+    }
+    return null;
   }
 
   Future<MediaToolStatus?> _verify(

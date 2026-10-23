@@ -1,8 +1,10 @@
 // test/services/media/media_tool_service_test.dart
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:open_note/services/media/media_import_settings.dart';
 import 'package:open_note/services/media/media_tool_service.dart';
 import 'package:open_note/services/media/process_runner.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 ProcessRunResult ok(String out) => ProcessRunResult(0, out, '');
 const ProcessRunResult fail = ProcessRunResult(1, '', '');
@@ -131,6 +133,106 @@ void main() {
       final libName = lib.uri.pathSegments.last;
       expect(File('$toolDirPath/$libName').existsSync(), isTrue);
       expect(File('$toolDirPath/readme.txt').existsSync(), isFalse);
+    });
+  });
+
+  group('check 验证缓存（yt-dlp 二进制 spawn 慢，避免重复验证）', () {
+    late Directory tmp;
+    late Map<String, String> store;
+    late Directory appDir;
+    late File bin;
+    late int runCount;
+
+    setUp(() {
+      tmp = Directory.systemTemp.createTempSync('vtn_cache');
+      store = <String, String>{};
+      runCount = 0;
+      appDir = Directory('${tmp.path}/tools/ffmpeg')
+        ..createSync(recursive: true);
+      bin = File('${appDir.path}/ffmpeg${Platform.isWindows ? '.exe' : ''}')
+        ..writeAsStringSync('x' * 10);
+    });
+    tearDown(() => tmp.deleteSync(recursive: true));
+
+    MediaToolService makeSvc() => MediaToolService(
+          resolveBaseDir: () async => tmp.path,
+          run: (exe, args) async {
+            if (!args.contains('-version')) return fail;
+            runCount++;
+            return ok('ffmpeg version 7.1');
+          },
+          cacheReader: () async => store,
+          cacheWriter: (m) async => store
+            ..clear()
+            ..addAll(m),
+        );
+
+    test('同一二进制第二次 check 不再 spawn 验证命令', () async {
+      final svc = makeSvc();
+      final st1 = await svc.check(MediaToolKind.ffmpeg);
+      expect(st1.ready, isTrue);
+      expect(runCount, 1);
+
+      final st2 = await svc.check(MediaToolKind.ffmpeg);
+      expect(st2.ready, isTrue);
+      expect(st2.version, '7.1');
+      expect(st2.source, MediaToolSource.appManaged);
+      expect(runCount, 1, reason: '缓存命中不应重复 spawn');
+    });
+
+    test('文件被替换（大小/mtime 变化）后缓存失效重新验证', () async {
+      final svc = makeSvc();
+      await svc.check(MediaToolKind.ffmpeg);
+      expect(runCount, 1);
+
+      bin.writeAsStringSync('x' * 99);
+      final st = await svc.check(MediaToolKind.ffmpeg);
+      expect(st.ready, isTrue);
+      expect(runCount, 2, reason: '二进制变化应重新验证');
+    });
+
+    test('forceVerify: true 绕过缓存强制重验', () async {
+      final svc = makeSvc();
+      await svc.check(MediaToolKind.ffmpeg);
+      expect(runCount, 1);
+
+      final st = await svc.check(MediaToolKind.ffmpeg, forceVerify: true);
+      expect(st.ready, isTrue);
+      expect(runCount, 2);
+    });
+
+    test('缓存跨实例持久化（新实例零 spawn 命中）', () async {
+      final svc1 = makeSvc();
+      await svc1.check(MediaToolKind.ffmpeg);
+      expect(runCount, 1);
+      expect(store, isNotEmpty);
+
+      runCount = 0;
+      final st = await makeSvc().check(MediaToolKind.ffmpeg);
+      expect(st.ready, isTrue);
+      expect(st.version, '7.1');
+      expect(runCount, 0, reason: '新实例应从持久化缓存命中');
+    });
+
+    test('二进制被删除后缓存失效回落 which 流程', () async {
+      final svc = makeSvc();
+      await svc.check(MediaToolKind.ffmpeg);
+      expect(runCount, 1);
+
+      bin.deleteSync();
+      final st = await svc.check(MediaToolKind.ffmpeg);
+      expect(st.ready, isFalse);
+      expect(runCount, 1, reason: '缓存因文件缺失失效，但 which 全失败无验证 spawn');
+    });
+
+    test('MediaImportSettings 验证缓存 roundtrip', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final settings = MediaImportSettings();
+      expect(await settings.readVerifyCache(), isEmpty);
+
+      await settings.writeVerifyCache({'ffmpeg': '{"p":"/a","s":1}'});
+      expect(await settings.readVerifyCache(),
+          {'ffmpeg': '{"p":"/a","s":1}'});
     });
   });
 

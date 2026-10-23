@@ -15,7 +15,8 @@ class _ReadyToolService extends MediaToolService {
   _ReadyToolService(Future<String> Function() base)
     : super(resolveBaseDir: base);
   @override
-  Future<MediaToolStatus> check(MediaToolKind kind) async {
+  Future<MediaToolStatus> check(MediaToolKind kind,
+      {bool forceVerify = false}) async {
     checkCount++;
     return MediaToolStatus(
       kind: kind,
@@ -32,7 +33,8 @@ class _GatedCheckToolService extends _ReadyToolService {
   _GatedCheckToolService(super.base);
 
   @override
-  Future<MediaToolStatus> check(MediaToolKind kind) async {
+  Future<MediaToolStatus> check(MediaToolKind kind,
+      {bool forceVerify = false}) async {
     if (checkGate != null) await checkGate!.future;
     return super.check(kind);
   }
@@ -51,7 +53,8 @@ class _AllModelsService extends WhisperModelService {
 class _SystemToolService extends _ReadyToolService {
   _SystemToolService(super.base);
   @override
-  Future<MediaToolStatus> check(MediaToolKind kind) async {
+  Future<MediaToolStatus> check(MediaToolKind kind,
+      {bool forceVerify = false}) async {
     checkCount++;
     return MediaToolStatus(
       kind: kind, ready: true, path: '/usr/bin/${kind.name}',

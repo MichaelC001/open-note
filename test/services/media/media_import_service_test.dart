@@ -11,7 +11,8 @@ import 'package:open_note/services/media/whisper_runner.dart';
 class _FakeToolService extends MediaToolService {
   _FakeToolService(Future<String> Function() base) : super(resolveBaseDir: base);
   @override
-  Future<MediaToolStatus> check(MediaToolKind kind) async => MediaToolStatus(
+  Future<MediaToolStatus> check(MediaToolKind kind,
+      {bool forceVerify = false}) async => MediaToolStatus(
       kind: kind,
       ready: true,
       path: 'fake',

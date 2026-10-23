@@ -41,7 +41,7 @@ class EnvCheckStep extends StatelessWidget {
                     ? null
                     : () => context
                           .read<MediaImportProvider>()
-                          .checkEnvironment(),
+                          .checkEnvironment(forceVerify: true),
               ),
             ],
           ),

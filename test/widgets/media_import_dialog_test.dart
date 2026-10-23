@@ -22,7 +22,8 @@ class _CountingToolService extends MediaToolService {
       : super(resolveBaseDir: () async => dir.path);
 
   @override
-  Future<MediaToolStatus> check(MediaToolKind kind) async {
+  Future<MediaToolStatus> check(MediaToolKind kind,
+      {bool forceVerify = false}) async {
     checkCount++;
     if (ytDlpMissing && kind == MediaToolKind.ytDlp) {
       return const MediaToolStatus.missing(MediaToolKind.ytDlp);

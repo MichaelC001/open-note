@@ -36,11 +36,20 @@ class MediaImportProvider extends ChangeNotifier {
     this.callAI,
     Future<ProcessRunResult> Function(String, List<String>)? installerRunner,
     Future<String?> Function()? brewPathResolver,
-  }) : toolService = toolService ?? MediaToolService(),
+  }) : toolService = toolService ?? _defaultToolService(),
        modelService = modelService ?? WhisperModelService(),
        downloader = downloader ?? MediaDownloader(),
        installerRunner = installerRunner ?? _defaultInstallerRunner,
        brewPathResolver = brewPathResolver ?? _defaultBrewPathResolver;
+
+  /// 默认工具服务：接 SharedPreferences 验证缓存（yt-dlp 等 spawn 慢的二进制免重复验证）。
+  static MediaToolService _defaultToolService() {
+    final s = MediaImportSettings();
+    return MediaToolService(
+      cacheReader: s.readVerifyCache,
+      cacheWriter: s.writeVerifyCache,
+    );
+  }
 
   MediaImportStep step = MediaImportStep.source;
   ImportSourceKind sourceKind = ImportSourceKind.url;
@@ -119,14 +128,15 @@ class MediaImportProvider extends ChangeNotifier {
     await checkEnvironment();
   }
 
-  Future<void> checkEnvironment() async {
+  Future<void> checkEnvironment({bool forceVerify = false}) async {
     _busy = true;
     errorMessage = null;
     errorDetail = null;
     _notify();
     try {
       for (final kind in MediaToolKind.values.where(isToolRequired)) {
-        toolStatuses[kind] = await toolService.check(kind);
+        toolStatuses[kind] =
+            await toolService.check(kind, forceVerify: forceVerify);
         _notify();
       }
       recommendedTier = await modelService.recommendTierForDevice();
@@ -231,7 +241,8 @@ class MediaImportProvider extends ChangeNotifier {
           throw Exception('安装包中未找到 $binName，请改用手动安装指引');
         }
       }
-      toolStatuses[kind] = await toolService.check(kind);
+      toolStatuses[kind] =
+          await toolService.check(kind, forceVerify: true);
       if (!(toolStatuses[kind]?.ready ?? false)) {
         errorMessage = '工具安装后校验未通过';
         errorDetail = null;
@@ -276,7 +287,8 @@ class MediaImportProvider extends ChangeNotifier {
         errorDetail = (r.stderr.trim().isNotEmpty ? r.stderr : r.stdout).trim();
         return;
       }
-      toolStatuses[kind] = await toolService.check(kind);
+      toolStatuses[kind] =
+          await toolService.check(kind, forceVerify: true);
     } catch (e) {
       errorMessage = '自动安装失败';
       errorDetail = e.toString();
@@ -349,7 +361,8 @@ class MediaImportProvider extends ChangeNotifier {
           return;
         }
       }
-      toolStatuses[kind] = await toolService.check(kind);
+      toolStatuses[kind] =
+          await toolService.check(kind, forceVerify: true);
     } catch (e) {
       errorMessage = '卸载失败';
       errorDetail = e.toString();

@@ -82,7 +82,7 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
                   tooltip: t.media_env_recheck,
                   onPressed: p.operationInProgress
                       ? null
-                      : () => p.checkEnvironment(),
+                      : () => p.checkEnvironment(forceVerify: true),
                 ),
               ],
             ),
