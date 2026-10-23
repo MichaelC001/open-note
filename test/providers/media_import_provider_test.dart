@@ -468,6 +468,25 @@ void main() {
       expect(fake.lastUrl, contains('/ffmpeg-static/releases/'));
       expect(fake.lastUrl, isNot(contains('/yt-dlp/')));
     });
+
+    test('downloadTool(ffmpeg) 更新时用检测到的具体 tag 下载并清除徽标', () async {
+      final fake = _CapturingDownloader();
+      final p = MediaImportProvider(
+        toolService: _ReadyToolService(() async => tmp.path),
+        modelService: _AllModelsService(() async => tmp.path),
+        downloader: fake,
+      );
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+      p.toolStatuses[MediaToolKind.ffmpeg] = const MediaToolStatus.missing(
+          MediaToolKind.ffmpeg);
+      p.updateAvailableVersion[MediaToolKind.ffmpeg] = 'b6.1.1';
+
+      await p.downloadTool(MediaToolKind.ffmpeg);
+
+      expect(fake.lastUrl, contains('/releases/download/b6.1.1/'));
+      expect(fake.lastUrl, isNot(contains('/releases/latest/')));
+      expect(p.updateAvailableVersion[MediaToolKind.ffmpeg], isNull);
+    });
   });
   group('工具静默新版本检查（checkToolUpdates）', () {
     MediaImportProvider makeUpdateProvider(_CountingFetcher fetcher) =>

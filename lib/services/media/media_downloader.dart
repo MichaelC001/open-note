@@ -23,15 +23,18 @@ class MediaDownloader {
   ];
 
   static const npmmirrorBase =
-      'https://registry.npmmirror.com/-/binary/ffmpeg-static/b6.0/';
+      'https://registry.npmmirror.com/-/binary/ffmpeg-static/';
 
   /// ffmpeg-static 资产在 npmmirror 的同名镜像（资产名与 GitHub release 一致）。
+  /// 仅映射具体 tag 的 release 下载链；latest 链不映射（npmmirror 目录按 tag 组织，
+  /// 钉死版本段会导致「更新」总命中旧版）。
   static List<String> npmmirrorUrls(String directUrl) {
     final m = RegExp(
-      r'ffmpeg-static/releases/[^/]+/download/(ffmpeg-[a-z0-9-]+)$',
+      r'ffmpeg-static/releases/download/([^/]+)/(ffmpeg-[a-z0-9-]+)$',
     ).firstMatch(directUrl);
-    if (m == null) return const [];
-    return ['$npmmirrorBase${m.group(1)}'];
+    final tag = m?.group(1);
+    if (m == null || tag == null || tag == 'latest') return const [];
+    return ['$npmmirrorBase$tag/${m.group(2)}'];
   }
 
   static List<String> mirrorUrls(String directUrl) {
@@ -76,8 +79,8 @@ class MediaDownloader {
   static String ytDlpDirectUrl() =>
       'https://github.com/yt-dlp/yt-dlp/releases/latest/download/${ytDlpAssetName()}';
 
-  /// 三平台统一 ffmpeg-static 单文件静态二进制；npmmirror 镜像置首（b6.0）。
-  static String ffmpegDirectUrl() {
+  /// ffmpeg-static 资产的「平台-位数」后缀。
+  static String _ffmpegAssetSuffix() {
     final arch = Platform.isMacOS
         ? 'darwin'
         : Platform.isWindows
@@ -92,7 +95,17 @@ class MediaDownloader {
         : isArm
             ? 'arm64'
             : 'x64';
-    return 'https://github.com/eugeneware/ffmpeg-static/releases/latest/download/ffmpeg-$arch-$bits';
+    return '$arch-$bits';
+  }
+
+  /// 三平台统一 ffmpeg-static 单文件静态二进制。
+  /// [tag] 为 null 时取 latest；否则下载该具体 tag（用于「更新到检测到的版本」）。
+  static String ffmpegDirectUrl({String? tag}) {
+    final asset = 'ffmpeg-${_ffmpegAssetSuffix()}';
+    if (tag == null || tag.isEmpty) {
+      return 'https://github.com/eugeneware/ffmpeg-static/releases/latest/download/$asset';
+    }
+    return 'https://github.com/eugeneware/ffmpeg-static/releases/download/$tag/$asset';
   }
 
   static String whisperReleasesApiUrl() =>

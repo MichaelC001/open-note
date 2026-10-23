@@ -253,6 +253,8 @@ class MediaImportProvider extends ChangeNotifier {
         (toolUninstalling[kind] ?? false)) {
       return;
     }
+    // 先取检测到的更新 tag 再清徽标：ffmpeg「更新」按该具体 tag 下载
+    final updateTag = updateAvailableVersion[kind];
     updateAvailableVersion[kind] = null;
     toolDownloading[kind] = true;
     toolDownloadStatus[kind] = const DownloadStatus();
@@ -279,7 +281,7 @@ class MediaImportProvider extends ChangeNotifier {
         await downloader.download(
           kind == MediaToolKind.ytDlp
               ? MediaDownloader.ytDlpDirectUrl()
-              : MediaDownloader.ffmpegDirectUrl(),
+              : MediaDownloader.ffmpegDirectUrl(tag: updateTag),
           destFile: dest,
           mode: await settings.downloadSource(),
           cancelToken: _downloadCancel,

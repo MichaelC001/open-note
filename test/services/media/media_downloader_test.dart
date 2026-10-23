@@ -8,23 +8,44 @@ import 'package:open_note/services/media/media_downloader.dart';
 void main() {
   const ffmpegUrl =
       'https://github.com/eugeneware/ffmpeg-static/releases/latest/download/ffmpeg-darwin-arm64';
+  const ffmpegTaggedUrl =
+      'https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-darwin-arm64';
   group('candidateUrls', () {
-    test('ffmpeg-static: auto 顺序 npmmirror 置首、直连居中', () {
+    test('ffmpeg-static: latest URL auto 顺序 [直连, gh-proxy, ghfast]（latest 不映射 npmmirror）', () {
       final urls = MediaDownloader.candidateUrls(
           ffmpegUrl, MediaDownloadSourceMode.auto);
-      expect(urls.first,
-          'https://registry.npmmirror.com/-/binary/ffmpeg-static/b6.0/ffmpeg-darwin-arm64');
-      expect(urls[1], ffmpegUrl);
-      expect(urls.any((u) => u.startsWith('https://gh-proxy.com/')), isTrue);
+      expect(urls, [
+        ffmpegUrl,
+        'https://gh-proxy.com/$ffmpegUrl',
+        'https://ghfast.top/$ffmpegUrl'
+      ]);
     });
-    test('ffmpeg-static: mirror 顺序 npmmirror > gh-proxy > ghfast > 直连', () {
+    test('ffmpeg-static: latest URL mirror 顺序 [gh-proxy, ghfast, 直连]', () {
       final urls = MediaDownloader.candidateUrls(
           ffmpegUrl, MediaDownloadSourceMode.mirror);
-      expect(urls,
-          ['https://registry.npmmirror.com/-/binary/ffmpeg-static/b6.0/ffmpeg-darwin-arm64',
-           'https://gh-proxy.com/$ffmpegUrl',
-           'https://ghfast.top/$ffmpegUrl',
-           ffmpegUrl]);
+      expect(urls, [
+        'https://gh-proxy.com/$ffmpegUrl',
+        'https://ghfast.top/$ffmpegUrl',
+        ffmpegUrl
+      ]);
+    });
+    test('ffmpeg-static: tagged URL auto 顺序 npmmirror(同 tag) 置首', () {
+      final urls = MediaDownloader.candidateUrls(
+          ffmpegTaggedUrl, MediaDownloadSourceMode.auto);
+      expect(urls, [
+        'https://registry.npmmirror.com/-/binary/ffmpeg-static/b6.1.1/ffmpeg-darwin-arm64',
+        ffmpegTaggedUrl,
+        'https://gh-proxy.com/$ffmpegTaggedUrl',
+        'https://ghfast.top/$ffmpegTaggedUrl'
+      ]);
+    });
+    test('ffmpeg-static: tagged URL mirrorUrls 含 npmmirror 同 tag 同名资产', () {
+      final mirrors = MediaDownloader.mirrorUrls(ffmpegTaggedUrl);
+      expect(
+          mirrors.first,
+          'https://registry.npmmirror.com/-/binary/ffmpeg-static/b6.1.1/'
+          'ffmpeg-darwin-arm64');
+      expect(mirrors, contains('https://gh-proxy.com/$ffmpegTaggedUrl'));
     });
     test('huggingface 模型: auto 仍为 [直连, hf-mirror]', () {
       const hf = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin';
@@ -98,11 +119,21 @@ void main() {
         expect(url.endsWith(isArm ? 'arm64' : 'x64'), isTrue);
       }
     });
-    test('npmmirrorUrls 从 ffmpeg-static 直链解析同名资产', () {
+    test('npmmirrorUrls：latest 不映射，tagged 映射同 tag 同名资产', () {
+      expect(MediaDownloader.npmmirrorUrls(ffmpegUrl), isEmpty);
       expect(
-          MediaDownloader.npmmirrorUrls(ffmpegUrl),
-          ['https://registry.npmmirror.com/-/binary/ffmpeg-static/b6.0/ffmpeg-darwin-arm64']);
+          MediaDownloader.npmmirrorUrls(ffmpegTaggedUrl),
+          [
+            'https://registry.npmmirror.com/-/binary/ffmpeg-static/b6.1.1/ffmpeg-darwin-arm64'
+          ]);
       expect(MediaDownloader.npmmirrorUrls('https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos'), isEmpty);
+    });
+    test('ffmpegDirectUrl 带 tag 使用具体 tag 而非 latest', () {
+      final url = MediaDownloader.ffmpegDirectUrl(tag: 'b6.1.1');
+      expect(url, contains('/releases/download/b6.1.1/ffmpeg-'));
+      expect(url, isNot(contains('/releases/latest/')));
+      final latest = MediaDownloader.ffmpegDirectUrl();
+      expect(latest, contains('/releases/latest/download/ffmpeg-'));
     });
     test('pickWhisperAsset 用 b5454 真实资产列表命中与排除', () {
       const b5454Assets = [
