@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg width="729px" height="223px" viewBox="0 0 729 223" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-    <title>编组 3</title>
+    <title>engine-ribbon-light</title>
     <defs>
         <rect id="path-1" x="0" y="0" width="729" height="223"></rect>
         <rect id="path-3" x="-1.65091807e-14" y="9.40331968e-15" width="765" height="387"></rect>
     </defs>
     <g id="视频转笔记" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
-        <g id="编组-3">
+        <g id="engine-ribbon-light">
             <mask id="mask-2" fill="white">
                 <use xlink:href="#path-1"></use>
             </mask>
@@ -17,7 +17,7 @@
                         <use xlink:href="#path-3"></use>
                     </mask>
                     <g id="矩形" stroke="none" fill="none"></g>
-                    <g id="编组" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd" mask="url(#mask-4)" stroke-opacity="0.25">
+                    <g id="编组" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd" mask="url(#mask-4)" stroke-opacity="0.18">
                         <g transform="translate(-319.4411, -195.038)">
                             <g id="编组-4" stroke="none" fill-rule="evenodd" transform="translate(670.9197, 435.1513) rotate(-15) translate(-670.9197, -435.1513)translate(52.6547, 150.3131)">
                                 <path d="M6.49778333,277.819772 C63.0160125,209.338001 127.018617,173.282012 198.505596,169.651803 C305.736065,164.206491 341.540752,217.179147 452.614971,217.179147 C563.68919,217.179147 637.890183,113.762962 754.978252,108.511178 C833.036965,105.00999 910.710142,133.228089 987.997783,193.165475" id="路径" stroke="#00C389" transform="translate(497.2478, 193.0206) scale(1, -1) rotate(-13) translate(-497.2478, -193.0206)"></path>
