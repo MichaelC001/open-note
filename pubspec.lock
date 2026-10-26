@@ -590,13 +590,13 @@ packages:
     source: hosted
     version: "4.1.2"
   image:
-    dependency: transitive
+    dependency: "direct overridden"
     description:
       name: image
       sha256: f31d52537dc417fdcde36088fdf11d191026fd5e4fae742491ebd40e5a8bea7d
       url: "https://pub.flutter-io.cn"
     source: hosted
-    version: "4.3.0"
+    version: "4.8.0"
   intl:
     dependency: "direct main"
     description:
@@ -901,14 +901,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "2.1.8"
-  printing:
-    dependency: "direct main"
+  posix:
+    dependency: transitive
     description:
-      name: printing
-      sha256: "689170c9ddb1bda85826466ba80378aa8993486d3c959a71cd7d2d80cb606692"
+      name: posix
+      sha256: "185ef7606574f789b40f289c233efa52e96dead518aed988e040a10737febb07"
       url: "https://pub.flutter-io.cn"
     source: hosted
-    version: "5.14.3"
+    version: "6.5.0"
   provider:
     dependency: "direct main"
     description:

@@ -48,7 +48,6 @@ dependencies:
   flutter_slidable: ^3.1.1
   path: ^1.9.1
   pdf: ^3.10.0
-  printing: ^5.12.0
   sqflite: ^2.4.2+1
   sqflite_common_ffi: ^2.4.0+3
   sqlite3: ^3.1.2
@@ -94,6 +93,8 @@ dev_dependencies:
 
 dependency_overrides:
   font_awesome_flutter: ^11.0.0
+  # image 4.11.0 调用了 archive 4.1+ 的 decodeLazy，但 pdf 3.12.0 限制 archive <4.1.0，会编译失败，钉在已知可用版本
+  image: 4.8.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
