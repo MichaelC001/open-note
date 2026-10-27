@@ -42,23 +42,22 @@ class _HoverHintState extends State<HoverHint> {
             followerAnchor: Alignment.topLeft,
             offset: const Offset(4, 6),
             child: IgnorePointer(
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 280),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color:
-                      isDark ? DesignTokens.darkSurface : DesignTokens.gray900,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
+              child: Material(
+                type: MaterialType.transparency,
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 280),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
                     color: isDark
-                        ? DesignTokens.darkBorder
+                        ? DesignTokens.darkSurface
                         : DesignTokens.gray700,
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                ),
-                child: Text(
-                  widget.message,
-                  style: const TextStyle(color: Colors.white, fontSize: 11),
+                  child: Text(
+                    widget.message,
+                    style: const TextStyle(color: Colors.white, fontSize: 11),
+                  ),
                 ),
               ),
             ),
