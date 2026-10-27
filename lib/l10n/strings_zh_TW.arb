@@ -204,7 +204,7 @@
   "@home_newBlankNote": {
     "description": "新建空白笔记"
   },
-  "home_createFromUrl": "從URL建立",
+  "home_createFromUrl": "網頁剪報",
   "@home_createFromUrl": {
     "description": "从URL创建"
   },
@@ -736,7 +736,7 @@
   "@dialog_codeDescription": {
     "description": "代码描述"
   },
-  "dialog_createFromUrl": "從URL建立筆記",
+  "dialog_createFromUrl": "網頁剪報",
   "@dialog_createFromUrl": {
     "description": "URL创建"
   },
@@ -2375,6 +2375,30 @@
   "media_polish_desc_raw": "原文直出，不使用 AI",
   "media_polish_desc_structured": "僅拆分段落，不改寫內容",
   "media_polish_desc_organized": "整理章節並重排，不改寫原意",
+  "home_hintNew": "新建一篇空白筆記，從零開始書寫",
+  "@home_hintNew": {
+    "description": "新建空白笔记菜单悬停提示"
+  },
+  "home_hintWebclip": "貼上網頁連結，擷取正文儲存為筆記",
+  "@home_hintWebclip": {
+    "description": "网页剪报菜单悬停提示"
+  },
+  "home_hintFile": "匯入本機檔案內容產生筆記",
+  "@home_hintFile": {
+    "description": "从文件导入菜单悬停提示"
+  },
+  "home_hintVideo": "從影片或音訊連結、本機檔案產生轉寫筆記",
+  "@home_hintVideo": {
+    "description": "视频转笔记菜单悬停提示"
+  },
+  "home_clipWebclip": "網頁剪報",
+  "@home_clipWebclip": {
+    "description": "剪贴板条网页剪报按钮"
+  },
+  "home_clipMedia": "從音訊視訊中建立",
+  "@home_clipMedia": {
+    "description": "剪贴板条从音视频中创建按钮"
+  },
   "media_env_background": "下載已在背景進行，可在 設定→影片轉筆記 查看進度",
   "media_env_uninstall": "解除安裝",
   "media_env_finishing": "下載完成 · 安裝中…",

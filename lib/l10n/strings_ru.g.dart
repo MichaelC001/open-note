@@ -188,7 +188,7 @@ class TranslationsRu extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get home_newBlankNote => 'Новая пустая заметка';
 
 	/// 从URL创建
-	@override String get home_createFromUrl => 'Создать из URL';
+	@override String get home_createFromUrl => 'Веб-клип';
 
 	/// 从文件导入
 	@override String get home_importFromFile => 'Импорт из файла';
@@ -587,7 +587,7 @@ class TranslationsRu extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get dialog_codeDescription => 'Редактор кода с подсветкой синтаксиса';
 
 	/// URL创建
-	@override String get dialog_createFromUrl => 'Создать заметку из URL';
+	@override String get dialog_createFromUrl => 'Веб-клип';
 
 	/// URL字段
 	@override String get dialog_webUrl => 'URL страницы';
@@ -1816,6 +1816,25 @@ class TranslationsRu extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get media_polish_desc_raw => 'Дословно, без ИИ';
 	@override String get media_polish_desc_structured => 'Только разбивка на абзацы, без правки';
 	@override String get media_polish_desc_organized => 'Разделы и порядок, без изменения смысла';
+
+	/// 新建空白笔记菜单悬停提示
+	@override String get home_hintNew => 'Создать пустую заметку с нуля';
+
+	/// 网页剪报菜单悬停提示
+	@override String get home_hintWebclip => 'Вставьте ссылку, чтобы извлечь текст в заметку';
+
+	/// 从文件导入菜单悬停提示
+	@override String get home_hintFile => 'Импорт локального файла в заметку';
+
+	/// 视频转笔记菜单悬停提示
+	@override String get home_hintVideo => 'Расшифровка видео или аудио по ссылке или файлу';
+
+	/// 剪贴板条网页剪报按钮
+	@override String get home_clipWebclip => 'Веб-клип';
+
+	/// 剪贴板条从音视频中创建按钮
+	@override String get home_clipMedia => 'Создать из аудио/видео';
+
 	@override String get media_env_background => 'Загрузка продолжается в фоне: Настройки → Видео в заметку.';
 	@override String get media_env_uninstall => 'Удалить';
 	@override String get media_env_finishing => 'Скачано · Установка…';

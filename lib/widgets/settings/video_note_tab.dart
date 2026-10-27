@@ -296,11 +296,12 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
       updateVersion: p.updateAvailableVersion[kind],
       checkingUpdate: p.updateChecking[kind] ?? false,
       uninstalling: p.toolUninstalling[kind] ?? false,
-      systemHint: (st?.ready ?? false) &&
-              st?.source == MediaToolSource.systemPath &&
-              !canUninstall
-          ? t.media_env_useManager
-          : null,
+      systemHint: p.toolHints[kind] ??
+          ((st?.ready ?? false) &&
+                  st?.source == MediaToolSource.systemPath &&
+                  !canUninstall
+              ? t.media_env_useManager
+              : null),
       guide: installGuides[kind]![platformKey]!,
       onAutoInstall: ToolStatusRow.canAutoInstall(kind, platformKey)
           ? () => p.autoInstallTool(kind)

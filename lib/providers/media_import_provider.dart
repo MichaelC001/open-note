@@ -21,6 +21,13 @@ enum MediaImportStep { source, envCheck, confirm, processing, done }
 
 enum ImportSourceKind { url, file }
 
+/// ffmpeg 新下载资产无法运行（装前可执行验证失败）。
+class ToolBinaryInvalidException implements Exception {
+  const ToolBinaryInvalidException();
+  @override
+  String toString() => '下载的引擎文件无法运行，已保留当前版本';
+}
+
 class MediaImportProvider extends ChangeNotifier {
   final MediaToolService toolService;
   final WhisperModelService modelService;
@@ -73,6 +80,8 @@ class MediaImportProvider extends ChangeNotifier {
   final Map<MediaToolKind, bool> toolUninstalling = {};
   final Map<MediaToolKind, String?> updateAvailableVersion = {};
   final Map<MediaToolKind, bool> updateChecking = {};
+  // 非阻断系统提示（经 ToolStatusRow.systemHint 渲染），如「更新未生效」
+  final Map<MediaToolKind, String> toolHints = {};
   Timer? _updateCheckTimer;
   bool modelDeleting = false;
   final Map<MediaToolKind, DownloadStatus> toolDownloadStatus = {};
@@ -321,6 +330,10 @@ class MediaImportProvider extends ChangeNotifier {
     }
     // 先取检测到的更新 tag 再清徽标：ffmpeg「更新」按该具体 tag 下载
     final updateTag = updateAvailableVersion.remove(kind);
+    final isUpdate = updateTag != null;
+    // 1b 装后版本比对基线：更新前的本地版本
+    final prevVersion = toolStatuses[kind]?.version;
+    toolHints.remove(kind);
     toolDownloading[kind] = true;
     toolDownloadStatus[kind] = const DownloadStatus();
     _downloadTrackers['tool:${kind.name}'] = DownloadSpeedTracker();
@@ -343,11 +356,14 @@ class MediaImportProvider extends ChangeNotifier {
       final dest = File('$dir/$binName');
       final isSingleFile = kind != MediaToolKind.whisperCli;
       if (isSingleFile) {
+        final isFfmpeg = kind == MediaToolKind.ffmpeg;
+        // 1a 装前可执行验证：ffmpeg 先下到 staging，验证通过才替换旧文件
+        final target = isFfmpeg ? File('${dest.path}.staging') : dest;
         await downloader.download(
           kind == MediaToolKind.ytDlp
               ? MediaDownloader.ytDlpDirectUrl()
               : MediaDownloader.ffmpegDirectUrl(tag: updateTag),
-          destFile: dest,
+          destFile: target,
           mode: await settings.downloadSource(),
           cancelToken: _downloadCancel,
           onProgress: (r, t) {
@@ -359,7 +375,22 @@ class MediaImportProvider extends ChangeNotifier {
           },
         );
         _markFinishing(kind);
-        if (!Platform.isWindows) {
+        if (isFfmpeg) {
+          final runnable = await verifyDownloadedBinary(target);
+          if (!runnable) {
+            // 坏资产：不替换旧版本，清理临时文件，走下载失败错误路径
+            try {
+              if (await target.exists()) await target.delete();
+            } catch (_) {}
+            throw const ToolBinaryInvalidException();
+          }
+          if (await dest.exists()) {
+            try {
+              await dest.delete();
+            } catch (_) {}
+          }
+          await target.rename(dest.path);
+        } else if (!Platform.isWindows) {
           await Process.run('chmod', ['+x', dest.path]);
         }
       } else {
@@ -409,9 +440,21 @@ class MediaImportProvider extends ChangeNotifier {
         errorMessage = '工具安装后校验未通过';
         errorDetail = null;
       } else {
+        // 1b 装后版本比对：更新场景下版本未变化（下载源内容未变化）
+        // → 徽标已清（内存开始时移除），落盘同步 + 非阻断提示
+        final newVersion = toolStatuses[kind]?.version;
+        if (isUpdate &&
+            newVersion != null &&
+            prevVersion != null &&
+            newVersion == prevVersion) {
+          toolHints[kind] = '更新未生效（下载源内容未变化），已保留当前版本';
+        }
         // 更新/下载安装成功：徽标已清，同步落盘（下次启动不再误报）
         await _persistUpdateAvailable();
       }
+    } on ToolBinaryInvalidException {
+      errorMessage = '下载的引擎文件无法运行，已保留当前版本';
+      errorDetail = null;
     } catch (e) {
       errorMessage = '工具下载/安装失败';
       errorDetail = e.toString();
@@ -421,6 +464,38 @@ class MediaImportProvider extends ChangeNotifier {
       _downloadCancel = null;
       _downloadTrackers.remove('tool:${kind.name}');
       _notify();
+    }
+  }
+
+  /// 1a 装前可执行验证：mac/linux `chmod +x` 后执行 `-version`（超时 5s），
+  /// windows 复制到同目录临时 `.exe` 再探测（PE 必须以 .exe 结尾才能启动）。
+  /// 退出码非 0 / 超时 / 被系统杀死 / 无法执行 → false（视为坏资产）。
+  Future<bool> verifyDownloadedBinary(File f) async {
+    File probe = f;
+    if (!Platform.isWindows) {
+      try {
+        await Process.run('chmod', ['+x', f.path]);
+      } catch (_) {}
+    } else {
+      probe = File('${f.path}.verify.exe');
+      try {
+        await f.copy(probe.path);
+      } catch (_) {
+        return false;
+      }
+    }
+    try {
+      final r = await installerRunner(probe.path, const ['-version'])
+          .timeout(const Duration(seconds: 5));
+      return r.exitCode == 0;
+    } catch (_) {
+      return false;
+    } finally {
+      if (probe.path != f.path) {
+        try {
+          await probe.delete();
+        } catch (_) {}
+      }
     }
   }
 

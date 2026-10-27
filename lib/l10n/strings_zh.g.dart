@@ -293,8 +293,8 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 
 	/// 从URL创建
 	///
-	/// zh: '从URL创建'
-	String get home_createFromUrl => '从URL创建';
+	/// zh: '网页剪报'
+	String get home_createFromUrl => '网页剪报';
 
 	/// 从文件导入
 	///
@@ -958,8 +958,8 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 
 	/// URL创建
 	///
-	/// zh: '从URL创建笔记'
-	String get dialog_createFromUrl => '从URL创建笔记';
+	/// zh: '网页剪报'
+	String get dialog_createFromUrl => '网页剪报';
 
 	/// URL字段
 	///
@@ -3095,6 +3095,36 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 
 	/// zh: '整理章节并重排，不改写原意'
 	String get media_polish_desc_organized => '整理章节并重排，不改写原意';
+
+	/// 新建空白笔记菜单悬停提示
+	///
+	/// zh: '新建一篇空白笔记，从零开始书写'
+	String get home_hintNew => '新建一篇空白笔记，从零开始书写';
+
+	/// 网页剪报菜单悬停提示
+	///
+	/// zh: '粘贴网页链接，提取正文保存为笔记'
+	String get home_hintWebclip => '粘贴网页链接，提取正文保存为笔记';
+
+	/// 从文件导入菜单悬停提示
+	///
+	/// zh: '导入本地文件内容生成笔记'
+	String get home_hintFile => '导入本地文件内容生成笔记';
+
+	/// 视频转笔记菜单悬停提示
+	///
+	/// zh: '从视频或音频链接、本地文件生成转写笔记'
+	String get home_hintVideo => '从视频或音频链接、本地文件生成转写笔记';
+
+	/// 剪贴板条网页剪报按钮
+	///
+	/// zh: '网页剪报'
+	String get home_clipWebclip => '网页剪报';
+
+	/// 剪贴板条从音视频中创建按钮
+	///
+	/// zh: '从音视频中创建'
+	String get home_clipMedia => '从音视频中创建';
 
 	/// zh: '下载已在后台进行，可在 设置→视频转笔记 查看进度'
 	String get media_env_background => '下载已在后台进行，可在 设置→视频转笔记 查看进度';

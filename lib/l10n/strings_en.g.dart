@@ -188,7 +188,7 @@ class TranslationsEn extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get home_newBlankNote => 'New Blank Note';
 
 	/// 从URL创建
-	@override String get home_createFromUrl => 'Create from URL';
+	@override String get home_createFromUrl => 'Web clip';
 
 	/// 从文件导入
 	@override String get home_importFromFile => 'Import from File';
@@ -587,7 +587,7 @@ class TranslationsEn extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get dialog_codeDescription => 'Code editor with syntax highlighting';
 
 	/// URL创建
-	@override String get dialog_createFromUrl => 'Create Note from URL';
+	@override String get dialog_createFromUrl => 'Web clip';
 
 	/// URL字段
 	@override String get dialog_webUrl => 'Web URL';
@@ -1822,6 +1822,25 @@ class TranslationsEn extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get media_polish_desc_raw => 'Verbatim output, no AI';
 	@override String get media_polish_desc_structured => 'Split paragraphs only, no rewriting';
 	@override String get media_polish_desc_organized => 'Organize sections & reorder, no rewriting';
+
+	/// 新建空白笔记菜单悬停提示
+	@override String get home_hintNew => 'Create a new blank note from scratch';
+
+	/// 网页剪报菜单悬停提示
+	@override String get home_hintWebclip => 'Paste a web link to extract its content into a note';
+
+	/// 从文件导入菜单悬停提示
+	@override String get home_hintFile => 'Import a local file to create a note';
+
+	/// 视频转笔记菜单悬停提示
+	@override String get home_hintVideo => 'Transcribe video or audio from a link or local file into notes';
+
+	/// 剪贴板条网页剪报按钮
+	@override String get home_clipWebclip => 'Web clip';
+
+	/// 剪贴板条从音视频中创建按钮
+	@override String get home_clipMedia => 'Create from audio/video';
+
 	@override String get media_env_background => 'Download continues in the background. Check Settings → Video to Note for progress.';
 	@override String get media_env_uninstall => 'Uninstall';
 	@override String get media_env_finishing => 'Downloaded · Installing…';

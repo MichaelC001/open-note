@@ -204,7 +204,7 @@
   "@home_newBlankNote": {
     "description": "新建空白笔记"
   },
-  "home_createFromUrl": "Create from URL",
+  "home_createFromUrl": "Web clip",
   "@home_createFromUrl": {
     "description": "从URL创建"
   },
@@ -736,7 +736,7 @@
   "@dialog_codeDescription": {
     "description": "代码描述"
   },
-  "dialog_createFromUrl": "Create Note from URL",
+  "dialog_createFromUrl": "Web clip",
   "@dialog_createFromUrl": {
     "description": "URL创建"
   },
@@ -2383,6 +2383,30 @@
   "media_polish_desc_raw": "Verbatim output, no AI",
   "media_polish_desc_structured": "Split paragraphs only, no rewriting",
   "media_polish_desc_organized": "Organize sections & reorder, no rewriting",
+  "home_hintNew": "Create a new blank note from scratch",
+  "@home_hintNew": {
+    "description": "新建空白笔记菜单悬停提示"
+  },
+  "home_hintWebclip": "Paste a web link to extract its content into a note",
+  "@home_hintWebclip": {
+    "description": "网页剪报菜单悬停提示"
+  },
+  "home_hintFile": "Import a local file to create a note",
+  "@home_hintFile": {
+    "description": "从文件导入菜单悬停提示"
+  },
+  "home_hintVideo": "Transcribe video or audio from a link or local file into notes",
+  "@home_hintVideo": {
+    "description": "视频转笔记菜单悬停提示"
+  },
+  "home_clipWebclip": "Web clip",
+  "@home_clipWebclip": {
+    "description": "剪贴板条网页剪报按钮"
+  },
+  "home_clipMedia": "Create from audio/video",
+  "@home_clipMedia": {
+    "description": "剪贴板条从音视频中创建按钮"
+  },
   "media_env_background":
       "Download continues in the background. Check Settings → Video to Note for progress.",
   "media_env_uninstall": "Uninstall",

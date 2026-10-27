@@ -15,12 +15,21 @@ class MediaImportDialog extends StatefulWidget {
   final void Function(String noteId)? onOpenNote;
   final Future<String?> Function(MediaImportResult result)? onSaveNote;
 
-  const MediaImportDialog({super.key, this.onOpenNote, this.onSaveNote});
+  /// 非 null 时打开即进入该 URL 的导入流程（如剪贴板侦测条入口）。
+  final String? initialUrl;
+
+  const MediaImportDialog({
+    super.key,
+    this.onOpenNote,
+    this.onSaveNote,
+    this.initialUrl,
+  });
 
   static Future<void> show(
     BuildContext context, {
     void Function(String)? onOpenNote,
     Future<String?> Function(MediaImportResult)? onSaveNote,
+    String? initialUrl,
   }) {
     return showDialog(
       context: context,
@@ -30,6 +39,7 @@ class MediaImportDialog extends StatefulWidget {
           child: MediaImportDialog(
             onOpenNote: onOpenNote,
             onSaveNote: onSaveNote,
+            initialUrl: initialUrl,
           ),
         ),
       ),
@@ -47,6 +57,12 @@ class _MediaImportDialogState extends State<MediaImportDialog> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final p = context.read<MediaImportProvider>();
+      if (widget.initialUrl != null) {
+        // startForUrl 会同步置 busy（environmentReady 时后台检测亦然），
+        // operationInProgress 守卫可挡住与既有自动重检的重入
+        if (!p.operationInProgress) p.startForUrl(widget.initialUrl!);
+        return;
+      }
       if (p.step == MediaImportStep.envCheck && !p.operationInProgress) {
         p.checkEnvironment();
       }

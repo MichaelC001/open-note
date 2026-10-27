@@ -488,6 +488,136 @@ void main() {
       expect(p.updateAvailableVersion[MediaToolKind.ffmpeg], isNull);
     });
   });
+  group('ffmpeg 装前可执行验证（坏资产防护）', () {
+    List<String> ranExe = [];
+    List<List<String>> ranArgs = [];
+
+    MediaImportProvider makeVerifyProvider({
+      required int exitCode,
+      _ReadyToolService? tools,
+    }) {
+      ranExe = [];
+      ranArgs = [];
+      return MediaImportProvider(
+        toolService: tools ?? _ReadyToolService(() async => tmp.path),
+        modelService: _AllModelsService(() async => tmp.path),
+        downloader: _WritingDownloader(),
+        installerRunner: (exe, args) async {
+          ranExe.add(exe);
+          ranArgs.add(args);
+          return ProcessRunResult(exitCode, 'ffmpeg version n6.0', '');
+        },
+      );
+    }
+
+    Future<File> destPath(MediaToolService tools, MediaToolKind kind) async =>
+        File('${await tools.toolDir(kind)}/${tools.binaryName(kind)}');
+
+    test('坏资产（exitCode 1）：旧文件不被替换，走错误路径并清理临时文件', () async {
+      final tools = _ReadyToolService(() async => tmp.path);
+      final dest = await destPath(tools, MediaToolKind.ffmpeg);
+      await dest.create(recursive: true);
+      await dest.writeAsString('OLD');
+      final p = makeVerifyProvider(exitCode: 1, tools: tools);
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+
+      await p.downloadTool(MediaToolKind.ffmpeg);
+
+      expect(ranExe, hasLength(1));
+      expect(ranExe.single, isNot(dest.path)); // 验证发生在替换前的临时文件上
+      expect(ranArgs.single, ['-version']);
+      expect(dest.readAsStringSync(), 'OLD'); // 旧文件未被替换
+      expect(p.errorMessage, '下载的引擎文件无法运行，已保留当前版本');
+      expect(File('${dest.path}.staging').existsSync(), isFalse); // 临时文件已清理
+      expect(p.toolDownloading[MediaToolKind.ffmpeg] ?? false, isFalse);
+      expect(p.toolFinishing[MediaToolKind.ffmpeg] ?? false, isFalse);
+    });
+
+    test('好资产（exitCode 0）：替换旧文件且无错误', () async {
+      final tools = _ReadyToolService(() async => tmp.path);
+      final dest = await destPath(tools, MediaToolKind.ffmpeg);
+      await dest.create(recursive: true);
+      await dest.writeAsString('OLD');
+      final p = makeVerifyProvider(exitCode: 0, tools: tools);
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+
+      await p.downloadTool(MediaToolKind.ffmpeg);
+
+      expect(dest.readAsStringSync(), 'NEW-BINARY');
+      expect(p.errorMessage, isNull);
+      expect(File('${dest.path}.staging').existsSync(), isFalse);
+    });
+
+    test('yt-dlp 不做装前可执行验证', () async {
+      final tools = _ReadyToolService(() async => tmp.path);
+      final dest = await destPath(tools, MediaToolKind.ytDlp);
+      final p = makeVerifyProvider(exitCode: 1, tools: tools);
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+
+      await p.downloadTool(MediaToolKind.ytDlp);
+
+      expect(ranExe, isEmpty); // 未执行 -version 探测
+      expect(dest.readAsStringSync(), 'NEW-BINARY'); // 直接落位
+      expect(File('${dest.path}.staging').existsSync(), isFalse);
+      expect(p.errorMessage, isNull);
+    });
+  });
+
+  group('装后版本比对（更新未生效检测）', () {
+    test('更新后版本未变化：清除更新标记并给出非阻断提示', () async {
+      // _ReadyToolService 恒返回 version '1' → 模拟镜像内容未变化
+      final p = MediaImportProvider(
+        toolService: _ReadyToolService(() async => tmp.path),
+        modelService: _AllModelsService(() async => tmp.path),
+        downloader: _WritingDownloader(),
+        installerRunner: (exe, args) async => const ProcessRunResult(0, '', ''),
+      );
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+      p.updateAvailableVersion[MediaToolKind.ffmpeg] = 'b6.1.1';
+
+      await p.downloadTool(MediaToolKind.ffmpeg);
+
+      expect(p.updateAvailableVersion[MediaToolKind.ffmpeg], isNull);
+      expect(await MediaImportSettings().readUpdateAvailable(), isEmpty);
+      expect(p.toolHints[MediaToolKind.ffmpeg], contains('更新未生效'));
+      expect(p.errorMessage, isNull); // 非阻断：无 ErrorBanner 错误
+    });
+
+    test('更新后版本变化：无提示，标记保持清除', () async {
+      final p = MediaImportProvider(
+        toolService: _VersionShiftToolService(() async => tmp.path),
+        modelService: _AllModelsService(() async => tmp.path),
+        downloader: _WritingDownloader(),
+        installerRunner: (exe, args) async => const ProcessRunResult(0, '', ''),
+      );
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+      p.updateAvailableVersion[MediaToolKind.ffmpeg] = 'b6.1';
+
+      await p.downloadTool(MediaToolKind.ffmpeg);
+
+      expect(p.updateAvailableVersion[MediaToolKind.ffmpeg], isNull);
+      expect(p.toolHints[MediaToolKind.ffmpeg], isNull);
+      expect(p.errorMessage, isNull);
+    });
+
+    test('非更新场景（首次安装）：不产生更新未生效提示', () async {
+      final p = MediaImportProvider(
+        toolService: _ReadyToolService(() async => tmp.path),
+        modelService: _AllModelsService(() async => tmp.path),
+        downloader: _WritingDownloader(),
+        installerRunner: (exe, args) async => const ProcessRunResult(0, '', ''),
+      );
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+      p.toolStatuses[MediaToolKind.ffmpeg] =
+          const MediaToolStatus.missing(MediaToolKind.ffmpeg);
+
+      await p.downloadTool(MediaToolKind.ffmpeg);
+
+      expect(p.toolHints[MediaToolKind.ffmpeg], isNull);
+      expect(p.errorMessage, isNull);
+    });
+  });
+
   group('工具静默新版本检查（checkToolUpdates）', () {
     MediaImportProvider makeUpdateProvider(_CountingFetcher fetcher) =>
         MediaImportProvider(
@@ -741,6 +871,8 @@ void main() {
         toolService: _ReadyToolService(() async => tmp.path),
         modelService: _AllModelsService(() async => tmp.path),
         downloader: _CapturingDownloader(),
+        // 装前可执行验证需通过：fake runner 模拟可运行资产
+        installerRunner: (exe, args) async => const ProcessRunResult(0, '', ''),
       );
       await p.startForFile(File('${tmp.path}/a.mp4'));
       await flushRestore();
@@ -842,7 +974,43 @@ class _CapturingDownloader extends MediaDownloader {
     String? expectedSha256,
   }) async {
     lastUrl = directUrl;
+    await destFile.parent.create(recursive: true);
+    await destFile.writeAsString('NEW-BINARY');
     return destFile;
+  }
+}
+
+/// 真实写入目标文件（模拟下载产物落盘），供装前验证链路测试。
+class _WritingDownloader extends MediaDownloader {
+  @override
+  Future<File> download(
+    String directUrl, {
+    required File destFile,
+    MediaDownloadSourceMode mode = MediaDownloadSourceMode.auto,
+    void Function(int received, int total)? onProgress,
+    CancelToken? cancelToken,
+    String? expectedSha256,
+  }) async {
+    await destFile.parent.create(recursive: true);
+    await destFile.writeAsString('NEW-BINARY');
+    return destFile;
+  }
+}
+
+/// 装前检测返回 6.0、forceVerify（装后重检）返回 6.1。
+class _VersionShiftToolService extends _ReadyToolService {
+  _VersionShiftToolService(super.base);
+  @override
+  Future<MediaToolStatus> check(MediaToolKind kind,
+      {bool forceVerify = false}) async {
+    checkCount++;
+    return MediaToolStatus(
+      kind: kind,
+      ready: true,
+      path: 'fake',
+      version: forceVerify ? '6.1' : '6.0',
+      source: MediaToolSource.appManaged,
+    );
   }
 }
 

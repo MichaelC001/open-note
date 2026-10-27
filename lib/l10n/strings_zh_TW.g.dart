@@ -188,7 +188,7 @@ class TranslationsZhTw extends Translations with BaseTranslations<AppLocale, Tra
 	@override String get home_newBlankNote => '建立空白筆記';
 
 	/// 从URL创建
-	@override String get home_createFromUrl => '從URL建立';
+	@override String get home_createFromUrl => '網頁剪報';
 
 	/// 从文件导入
 	@override String get home_importFromFile => '從檔案匯入';
@@ -587,7 +587,7 @@ class TranslationsZhTw extends Translations with BaseTranslations<AppLocale, Tra
 	@override String get dialog_codeDescription => '程式碼編輯器，支援語法突顯';
 
 	/// URL创建
-	@override String get dialog_createFromUrl => '從URL建立筆記';
+	@override String get dialog_createFromUrl => '網頁剪報';
 
 	/// URL字段
 	@override String get dialog_webUrl => '網頁URL';
@@ -1816,6 +1816,25 @@ class TranslationsZhTw extends Translations with BaseTranslations<AppLocale, Tra
 	@override String get media_polish_desc_raw => '原文直出，不使用 AI';
 	@override String get media_polish_desc_structured => '僅拆分段落，不改寫內容';
 	@override String get media_polish_desc_organized => '整理章節並重排，不改寫原意';
+
+	/// 新建空白笔记菜单悬停提示
+	@override String get home_hintNew => '新建一篇空白筆記，從零開始書寫';
+
+	/// 网页剪报菜单悬停提示
+	@override String get home_hintWebclip => '貼上網頁連結，擷取正文儲存為筆記';
+
+	/// 从文件导入菜单悬停提示
+	@override String get home_hintFile => '匯入本機檔案內容產生筆記';
+
+	/// 视频转笔记菜单悬停提示
+	@override String get home_hintVideo => '從影片或音訊連結、本機檔案產生轉寫筆記';
+
+	/// 剪贴板条网页剪报按钮
+	@override String get home_clipWebclip => '網頁剪報';
+
+	/// 剪贴板条从音视频中创建按钮
+	@override String get home_clipMedia => '從音訊視訊中建立';
+
 	@override String get media_env_background => '下載已在背景進行，可在 設定→影片轉筆記 查看進度';
 	@override String get media_env_uninstall => '解除安裝';
 	@override String get media_env_finishing => '下載完成 · 安裝中…';

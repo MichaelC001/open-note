@@ -204,7 +204,7 @@
   "@home_newBlankNote": {
     "description": "新建空白笔记"
   },
-  "home_createFromUrl": "Создать из URL",
+  "home_createFromUrl": "Веб-клип",
   "@home_createFromUrl": {
     "description": "从URL创建"
   },
@@ -736,7 +736,7 @@
   "@dialog_codeDescription": {
     "description": "代码描述"
   },
-  "dialog_createFromUrl": "Создать заметку из URL",
+  "dialog_createFromUrl": "Веб-клип",
   "@dialog_createFromUrl": {
     "description": "URL创建"
   },
@@ -2375,6 +2375,30 @@
   "media_polish_desc_raw": "Дословно, без ИИ",
   "media_polish_desc_structured": "Только разбивка на абзацы, без правки",
   "media_polish_desc_organized": "Разделы и порядок, без изменения смысла",
+  "home_hintNew": "Создать пустую заметку с нуля",
+  "@home_hintNew": {
+    "description": "新建空白笔记菜单悬停提示"
+  },
+  "home_hintWebclip": "Вставьте ссылку, чтобы извлечь текст в заметку",
+  "@home_hintWebclip": {
+    "description": "网页剪报菜单悬停提示"
+  },
+  "home_hintFile": "Импорт локального файла в заметку",
+  "@home_hintFile": {
+    "description": "从文件导入菜单悬停提示"
+  },
+  "home_hintVideo": "Расшифровка видео или аудио по ссылке или файлу",
+  "@home_hintVideo": {
+    "description": "视频转笔记菜单悬停提示"
+  },
+  "home_clipWebclip": "Веб-клип",
+  "@home_clipWebclip": {
+    "description": "剪贴板条网页剪报按钮"
+  },
+  "home_clipMedia": "Создать из аудио/видео",
+  "@home_clipMedia": {
+    "description": "剪贴板条从音视频中创建按钮"
+  },
   "media_env_background": "Загрузка продолжается в фоне: Настройки → Видео в заметку.",
   "media_env_uninstall": "Удалить",
   "media_env_finishing": "Скачано · Установка…",

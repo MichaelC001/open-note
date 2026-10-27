@@ -24,6 +24,7 @@ import '../services/clipboard_service.dart';
 import '../widgets/url_input_dialog.dart';
 import '../widgets/search_dialog.dart';
 import '../widgets/media_import/media_import_dialog.dart';
+import '../widgets/home/clipboard_hint_bar.dart';
 import '../utils/responsive.dart';
 import '../utils/snackbar_helper.dart';
 import '../theme/design_tokens.dart';
@@ -248,6 +249,17 @@ class _HomeScreenState extends State<HomeScreen> with ClipboardListener {
     }
   }
 
+  /// 剪贴板条「从音视频中创建」：复用侦测到的 url，进入音视频转写向导
+  void _useClipboardMediaUrl() {
+    final url = _clipboardUrl;
+    if (url == null) return;
+    _clipboardService.updateLastContent(url);
+    setState(() {
+      _showClipboardHint = false;
+    });
+    _showMediaImportDialog(initialUrl: url);
+  }
+
   void _dismissClipboardHint() {
     final content = _clipboardUrl;
     if (content != null) {
@@ -310,9 +322,10 @@ class _HomeScreenState extends State<HomeScreen> with ClipboardListener {
     );
   }
 
-  void _showMediaImportDialog() {
+  void _showMediaImportDialog({String? initialUrl}) {
     MediaImportDialog.show(
       context,
+      initialUrl: initialUrl,
       onOpenNote: (noteId) async {
         final notesProvider = context.read<NotesProvider>();
         final fullNote = await notesProvider.getFullNote(noteId);
@@ -702,44 +715,11 @@ class _HomeScreenState extends State<HomeScreen> with ClipboardListener {
   }
 
   Widget _buildClipboardHintBar(bool isDark) {
-    return Material(
-      color: DesignTokens.primary500.withValues(alpha: isDark ? 0.65 : 0.1),
-      child: Container(
-        width: double.infinity,
-        padding: EdgeInsets.symmetric(
-          horizontal: DesignTokens.space8,
-          vertical: DesignTokens.space6,
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.link, size: 18, color: DesignTokens.primary500),
-            SizedBox(width: DesignTokens.space6),
-            Expanded(
-              child: Text(
-                t.home_clipboardUrlDetected,
-                style: TextStyle(
-                  color: DesignTokens.primary500,
-                  fontSize: DesignTokens.fontSizeBody,
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed: _useClipboardUrl,
-              style: TextButton.styleFrom(
-                foregroundColor: DesignTokens.primary500,
-              ),
-              child: Text(t.dialog_createNote),
-            ),
-            TextButton(
-              onPressed: _dismissClipboardHint,
-              style: TextButton.styleFrom(
-                foregroundColor: DesignTokens.gray500,
-              ),
-              child: Text(t.home_dismiss),
-            ),
-          ],
-        ),
-      ),
+    return ClipboardHintBar(
+      isDark: isDark,
+      onWebclip: _useClipboardUrl,
+      onMedia: _useClipboardMediaUrl,
+      onDismiss: _dismissClipboardHint,
     );
   }
 
@@ -959,101 +939,113 @@ class _HomeScreenState extends State<HomeScreen> with ClipboardListener {
                     PopupMenuItem(
                       value: 'new',
                       height: 40,
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.note_add,
-                            size: 18,
-                            color: isDark
-                                ? DesignTokens.darkPrimary500
-                                : DesignTokens.primary500,
-                          ),
-                          SizedBox(width: DesignTokens.space3),
-                          Text(
-                            t.home_newBlankNote,
-                            style: TextStyle(
-                              fontSize: DesignTokens.fontSizeBody,
+                      child: Tooltip(
+                        message: t.home_hintNew,
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.note_add,
+                              size: 18,
                               color: isDark
-                                  ? DesignTokens.darkTextPrimary
-                                  : DesignTokens.gray700,
+                                  ? DesignTokens.darkPrimary500
+                                  : DesignTokens.primary500,
                             ),
-                          ),
-                        ],
+                            SizedBox(width: DesignTokens.space3),
+                            Text(
+                              t.home_newBlankNote,
+                              style: TextStyle(
+                                fontSize: DesignTokens.fontSizeBody,
+                                color: isDark
+                                    ? DesignTokens.darkTextPrimary
+                                    : DesignTokens.gray700,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     PopupMenuItem(
                       value: 'url',
                       height: 40,
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.link,
-                            size: 18,
-                            color: isDark
-                                ? DesignTokens.darkPrimary500
-                                : DesignTokens.primary500,
-                          ),
-                          SizedBox(width: DesignTokens.space3),
-                          Text(
-                            t.home_createFromUrl,
-                            style: TextStyle(
-                              fontSize: DesignTokens.fontSizeBody,
+                      child: Tooltip(
+                        message: t.home_hintWebclip,
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.link,
+                              size: 18,
                               color: isDark
-                                  ? DesignTokens.darkTextPrimary
-                                  : DesignTokens.gray700,
+                                  ? DesignTokens.darkPrimary500
+                                  : DesignTokens.primary500,
                             ),
-                          ),
-                        ],
+                            SizedBox(width: DesignTokens.space3),
+                            Text(
+                              t.home_createFromUrl,
+                              style: TextStyle(
+                                fontSize: DesignTokens.fontSizeBody,
+                                color: isDark
+                                    ? DesignTokens.darkTextPrimary
+                                    : DesignTokens.gray700,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     PopupMenuItem(
                       value: 'file',
                       height: 40,
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.upload_file,
-                            size: 18,
-                            color: isDark
-                                ? DesignTokens.darkPrimary500
-                                : DesignTokens.primary500,
-                          ),
-                          SizedBox(width: DesignTokens.space3),
-                          Text(
-                            t.home_importFromFile,
-                            style: TextStyle(
-                              fontSize: DesignTokens.fontSizeBody,
+                      child: Tooltip(
+                        message: t.home_hintFile,
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.upload_file,
+                              size: 18,
                               color: isDark
-                                  ? DesignTokens.darkTextPrimary
-                                  : DesignTokens.gray700,
+                                  ? DesignTokens.darkPrimary500
+                                  : DesignTokens.primary500,
                             ),
-                          ),
-                        ],
+                            SizedBox(width: DesignTokens.space3),
+                            Text(
+                              t.home_importFromFile,
+                              style: TextStyle(
+                                fontSize: DesignTokens.fontSizeBody,
+                                color: isDark
+                                    ? DesignTokens.darkTextPrimary
+                                    : DesignTokens.gray700,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     PopupMenuItem(
                       value: 'video',
                       height: 40,
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.smart_display,
-                            size: 18,
-                            color: isDark
-                                ? DesignTokens.darkPrimary500
-                                : DesignTokens.primary500,
-                          ),
-                          SizedBox(width: DesignTokens.space3),
-                          Text(
-                            t.home_videoToNote,
-                            style: TextStyle(
-                              fontSize: DesignTokens.fontSizeBody,
+                      child: Tooltip(
+                        message: t.home_hintVideo,
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.smart_display,
+                              size: 18,
                               color: isDark
-                                  ? DesignTokens.darkTextPrimary
-                                  : DesignTokens.gray700,
+                                  ? DesignTokens.darkPrimary500
+                                  : DesignTokens.primary500,
                             ),
-                          ),
-                        ],
+                            SizedBox(width: DesignTokens.space3),
+                            Text(
+                              t.home_videoToNote,
+                              style: TextStyle(
+                                fontSize: DesignTokens.fontSizeBody,
+                                color: isDark
+                                    ? DesignTokens.darkTextPrimary
+                                    : DesignTokens.gray700,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],

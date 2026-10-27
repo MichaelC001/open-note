@@ -203,6 +203,19 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('toolHints 更新未生效提示经 systemHint 渲染在工具行下', (tester) async {
+      tools.ytDlpMissing = true; // 使 ffmpeg/whisper 行处于 ready（提示仅在 ready 分支渲染）
+      final provider = makeProvider();
+      await pumpDialogWith(tester, provider);
+      await provider.startForFile(File('/tmp/demo.mp4'));
+      await tester.pumpAndSettle();
+      provider.toolHints[MediaToolKind.ffmpeg] = '更新未生效（下载源内容未变化），已保留当前版本';
+      provider.notifyListeners();
+      await tester.pumpAndSettle();
+
+      expect(find.text('更新未生效（下载源内容未变化），已保留当前版本'), findsOneWidget);
+    });
+
     testWidgets('whisperCpp 未安装时提供一键安装按钮（macOS/Windows）',
         (tester) async {
       final provider = makeProvider();
@@ -312,6 +325,38 @@ void main() {
       expect(provider.step, MediaImportStep.source);
       expect(provider.pickedFile, isNull);
       expect(provider.urlInput, isEmpty);
+    });
+
+    testWidgets('show(initialUrl:) 打开即进入该 URL 的流程', (tester) async {
+      final provider = makeProvider();
+      await tester.pumpWidget(
+        TranslationProvider(
+          child: ChangeNotifierProvider<MediaImportProvider>.value(
+            value: provider,
+            child: MaterialApp(
+              home: Scaffold(
+                body: Builder(
+                  builder: (context) => Center(
+                    child: TextButton(
+                      onPressed: () => MediaImportDialog.show(
+                        context,
+                        initialUrl: 'https://example.com/v.mp4',
+                      ),
+                      child: const Text('open'),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      expect(provider.urlInput, 'https://example.com/v.mp4');
+      expect(provider.step, isNot(MediaImportStep.source));
     });
 
     testWidgets('下载中关闭向导：提示后台继续且不取消下载', (tester) async {
