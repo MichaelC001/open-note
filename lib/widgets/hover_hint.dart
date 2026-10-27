@@ -33,28 +33,33 @@ class _HoverHintState extends State<HoverHint> {
       if (!mounted || _entry != null) return;
       final isDark = Theme.of(context).brightness == Brightness.dark;
       _entry = OverlayEntry(
-        builder: (_) => CompositedTransformFollower(
-          link: _link,
-          targetAnchor: Alignment.bottomLeft,
-          followerAnchor: Alignment.topLeft,
-          offset: const Offset(4, 6),
-          child: IgnorePointer(
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 280),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: isDark ? DesignTokens.darkSurface : DesignTokens.gray900,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: isDark
-                      ? DesignTokens.darkBorder
-                      : DesignTokens.gray700,
+        builder: (_) => Positioned(
+          left: 0,
+          top: 0,
+          child: CompositedTransformFollower(
+            link: _link,
+            targetAnchor: Alignment.bottomLeft,
+            followerAnchor: Alignment.topLeft,
+            offset: const Offset(4, 6),
+            child: IgnorePointer(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 280),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color:
+                      isDark ? DesignTokens.darkSurface : DesignTokens.gray900,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isDark
+                        ? DesignTokens.darkBorder
+                        : DesignTokens.gray700,
+                  ),
                 ),
-              ),
-              child: Text(
-                widget.message,
-                style: const TextStyle(color: Colors.white, fontSize: 11),
+                child: Text(
+                  widget.message,
+                  style: const TextStyle(color: Colors.white, fontSize: 11),
+                ),
               ),
             ),
           ),
