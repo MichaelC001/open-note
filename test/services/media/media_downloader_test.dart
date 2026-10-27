@@ -199,7 +199,7 @@ void main() {
       final archive = Archive()
         ..addFile(ArchiveFile('inner.txt', 'hi'.length, 'hi'.codeUnits));
       final zip = File('${tmp.path}/t.zip')
-        ..writeAsBytesSync(ZipEncoder().encode(archive)!);
+        ..writeAsBytesSync(ZipEncoder().encode(archive));
       final out = '${tmp.path}/out';
       await MediaDownloader().extract(zip, out);
       expect(File('$out/inner.txt').readAsStringSync(), 'hi');
