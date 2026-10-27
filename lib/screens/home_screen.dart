@@ -941,6 +941,7 @@ class _HomeScreenState extends State<HomeScreen> with ClipboardListener {
                       height: 40,
                       child: Tooltip(
                         message: t.home_hintNew,
+                        preferBelow: false,
                         child: Row(
                           children: [
                             Icon(
@@ -969,6 +970,7 @@ class _HomeScreenState extends State<HomeScreen> with ClipboardListener {
                       height: 40,
                       child: Tooltip(
                         message: t.home_hintWebclip,
+                        preferBelow: false,
                         child: Row(
                           children: [
                             Icon(
@@ -997,6 +999,7 @@ class _HomeScreenState extends State<HomeScreen> with ClipboardListener {
                       height: 40,
                       child: Tooltip(
                         message: t.home_hintFile,
+                        preferBelow: false,
                         child: Row(
                           children: [
                             Icon(
@@ -1025,6 +1028,7 @@ class _HomeScreenState extends State<HomeScreen> with ClipboardListener {
                       height: 40,
                       child: Tooltip(
                         message: t.home_hintVideo,
+                        preferBelow: true,
                         child: Row(
                           children: [
                             Icon(
