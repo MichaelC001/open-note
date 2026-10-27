@@ -6,6 +6,7 @@ import '../../l10n/strings.g.dart';
 import '../../providers/media_import_provider.dart';
 import '../../services/media/media_import_service.dart';
 import '../../services/media/whisper_model_service.dart';
+import '../../theme/design_tokens.dart';
 
 class ConfirmStep extends StatefulWidget {
   final Future<String?> Function(MediaImportResult result)? saveNote;
@@ -36,10 +37,18 @@ class _ConfirmStepState extends State<ConfirmStep> {
           trailing: DropdownButton<WhisperModelTier>(
             value: p.selectedTier,
             items: [
+              // 防御性禁选：未下载档禁用且文字置灰（items 仍含全量 tier，
+              // selectedTier 停留在未下载档时 value 依旧合法，按钮侧兜底禁用）
               for (final tier in WhisperModelTier.values)
                 DropdownMenuItem(
                   value: tier,
-                  child: Text(WhisperModelService.infoFor(tier).displayLabel),
+                  enabled: p.downloadedTiers.contains(tier),
+                  child: Text(
+                    WhisperModelService.infoFor(tier).displayLabel,
+                    style: p.downloadedTiers.contains(tier)
+                        ? null
+                        : const TextStyle(color: DesignTokens.gray400),
+                  ),
                 ),
             ],
             onChanged: (v) {
@@ -66,7 +75,9 @@ class _ConfirmStepState extends State<ConfirmStep> {
         ),
         const SizedBox(height: 12),
         FilledButton.icon(
-          onPressed: p.busy || widget.saveNote == null
+          onPressed: p.busy ||
+                  widget.saveNote == null ||
+                  !p.downloadedTiers.contains(p.selectedTier)
               ? null
               : () => context
                   .read<MediaImportProvider>()

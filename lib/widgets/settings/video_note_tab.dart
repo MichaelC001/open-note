@@ -186,6 +186,9 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
               title: Text(t.media_settings_deleteSource),
               value: _deleteSource,
               activeThumbColor: DesignTokens.primary500,
+              // Material3 暗色下默认拨杆色与轨道同色系不可见：off 白拨杆在灰轨道、
+              // on 白拨杆在 primary 轨道均可见（thumbColor 优先于 activeThumbColor 解析）
+              thumbColor: const WidgetStatePropertyAll(Colors.white),
               onChanged: (v) async {
                 await _settings.setDeleteSourceAfter(v);
                 setState(() => _deleteSource = v);
@@ -230,6 +233,7 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
               title: Text(t.media_settings_timestamps),
               value: _includeTimestamps,
               activeThumbColor: DesignTokens.primary500,
+              thumbColor: const WidgetStatePropertyAll(Colors.white),
               onChanged: (v) async {
                 await _settings.setIncludeTimestamps(v);
                 setState(() => _includeTimestamps = v);

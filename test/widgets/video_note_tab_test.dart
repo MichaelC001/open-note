@@ -16,6 +16,7 @@ import 'package:open_note/services/media/media_tool_service.dart';
 import 'package:open_note/services/media/transcript_formatter.dart';
 import 'package:open_note/services/media/tool_update_service.dart';
 import 'package:open_note/services/media/whisper_model_service.dart';
+import 'package:open_note/theme/design_tokens.dart';
 import 'package:open_note/utils/app_info.dart';
 import 'package:open_note/widgets/settings/video_note_tab.dart';
 import 'package:open_note/widgets/settings_dialog.dart';
@@ -471,5 +472,35 @@ void main() {
 
     expect(provider.updateAvailableVersion[MediaToolKind.ffmpeg], isNull);
     expect(fakeDl.lastUrl, contains('/ffmpeg-static/releases/'));
+  });
+
+  testWidgets('暗色模式两个开关拨杆白色可见（thumbColor 生效）', (tester) async {
+    tester.view.physicalSize = const Size(1280, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final provider = makeProvider(toolsReady: true);
+    await tester.pumpWidget(
+      TranslationProvider(
+        child: ChangeNotifierProvider<MediaImportProvider>.value(
+          value: provider,
+          child: MaterialApp(
+            theme: ThemeData(brightness: Brightness.dark),
+            home: Scaffold(body: VideoNoteTab(modelService: modelsFake)),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 范围仅删除源/关键时间戳两个开关
+    final switches =
+        tester.widgetList<SwitchListTile>(find.byType(SwitchListTile)).toList();
+    expect(switches.length, 2);
+    for (final s in switches) {
+      expect(s.thumbColor?.resolve(const <WidgetState>{}), Colors.white);
+      // 既有 activeThumbColor 保留
+      expect(s.activeThumbColor, DesignTokens.primary500);
+    }
   });
 }

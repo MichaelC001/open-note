@@ -11,7 +11,11 @@ import 'package:open_note/services/media/media_downloader.dart';
 import 'package:open_note/services/media/media_import_service.dart';
 import 'package:open_note/services/media/media_tool_service.dart';
 import 'package:open_note/services/media/whisper_model_service.dart';
+import 'package:open_note/theme/design_tokens.dart';
+import 'package:open_note/widgets/media_import/confirm_step.dart';
+import 'package:open_note/widgets/media_import/env_check_step.dart';
 import 'package:open_note/widgets/media_import/media_import_dialog.dart';
+import 'package:open_note/widgets/media_import/tool_status_row.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -412,6 +416,158 @@ void main() {
       // 冲洗 SnackBar 自动消失 Timer（4s）及其退场动画，避免 pending timer
       await tester.pump(const Duration(seconds: 5));
       await tester.pumpAndSettle();
+    });
+  });
+
+  group('confirm 步骤模型防御性禁选', () {
+    late Directory tmpTools;
+    late Directory tmpModels;
+
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+      tmpTools = Directory.systemTemp.createTempSync('vtn_cf_t');
+      tmpModels = Directory.systemTemp.createTempSync('vtn_cf_m');
+    });
+
+    tearDown(() {
+      try {
+        tmpTools.deleteSync(recursive: true);
+        tmpModels.deleteSync(recursive: true);
+      } catch (_) {}
+    });
+
+    MediaImportProvider makeProvider() => MediaImportProvider(
+          toolService: _CountingToolService(tmpTools),
+          modelService: _FastModelService(tmpModels),
+        );
+
+    Future<void> pumpConfirm(
+        WidgetTester tester, MediaImportProvider provider) async {
+      await tester.pumpWidget(
+        TranslationProvider(
+          child: ChangeNotifierProvider<MediaImportProvider>.value(
+            value: provider,
+            child: MaterialApp(
+              home: Scaffold(
+                body: ConfirmStep(saveNote: (_) async => 'note-1'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    DropdownButton<WhisperModelTier> tierDropdown(WidgetTester tester) =>
+        tester.widget<DropdownButton<WhisperModelTier>>(
+            find.byType(DropdownButton<WhisperModelTier>));
+
+    testWidgets('未下载档在下拉中禁用且文字置灰，已下载档可选中', (tester) async {
+      final provider = makeProvider();
+      provider.downloadedTiers..clear()..add(WhisperModelTier.base);
+      provider.selectTier(WhisperModelTier.base);
+      await pumpConfirm(tester, provider);
+
+      final items = tierDropdown(tester).items!;
+      // 全量 tier 仍在：selectedTier 停留在未下载档时 value 依旧合法
+      expect(items.map((i) => i.value).toSet(), WhisperModelTier.values.toSet());
+      final byTier = {for (final i in items) i.value!: i};
+      expect(byTier[WhisperModelTier.base]!.enabled, isTrue);
+      expect(byTier[WhisperModelTier.medium]!.enabled, isFalse);
+      // 未下载项文字灰色，已下载项保持现状样式（不覆写颜色）
+      expect((byTier[WhisperModelTier.medium]!.child as Text).style?.color,
+          DesignTokens.gray400);
+      expect(
+          (byTier[WhisperModelTier.base]!.child as Text).style?.color, isNull);
+    });
+
+    testWidgets('selectedTier 未下载时开始按钮禁用（防御），切到已下载档恢复', (tester) async {
+      final provider = makeProvider();
+      provider.downloadedTiers..clear()..add(WhisperModelTier.base);
+      provider.selectTier(WhisperModelTier.medium); // 未下载
+      await pumpConfirm(tester, provider);
+
+      FilledButton startButton() =>
+          tester.widget<FilledButton>(find.byType(FilledButton));
+      // 边界：selectedTier 恰好未下载，下拉 value 仍合法不抛错
+      expect(tierDropdown(tester).value, WhisperModelTier.medium);
+      expect(tester.takeException(), isNull);
+      expect(startButton().onPressed, isNull);
+
+      provider.selectTier(WhisperModelTier.base); // 已下载
+      await tester.pumpAndSettle();
+      expect(startButton().onPressed, isNotNull);
+    });
+  });
+
+  group('envCheck 下一步固定底部', () {
+    late Directory tmpTools;
+    late Directory tmpModels;
+
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+      tmpTools = Directory.systemTemp.createTempSync('vtn_ev_t');
+      tmpModels = Directory.systemTemp.createTempSync('vtn_ev_m');
+    });
+
+    tearDown(() {
+      try {
+        tmpTools.deleteSync(recursive: true);
+        tmpModels.deleteSync(recursive: true);
+      } catch (_) {}
+    });
+
+    MediaImportProvider makeProvider() => MediaImportProvider(
+          toolService: _CountingToolService(tmpTools),
+          modelService: _FastModelService(tmpModels),
+        );
+
+    Future<void> pumpEnvCheck(
+        WidgetTester tester, MediaImportProvider provider) async {
+      await tester.pumpWidget(
+        TranslationProvider(
+          child: ChangeNotifierProvider<MediaImportProvider>.value(
+            value: provider,
+            child: const MaterialApp(home: Scaffold(body: EnvCheckStep())),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    double nextButtonTop(WidgetTester tester) =>
+        tester.getTopLeft(find.widgetWithText(FilledButton, '下一步')).dy;
+
+    testWidgets('小视口（400 高）下一步按钮无需滚动即可见', (tester) async {
+      tester.view.physicalSize = const Size(500, 400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final provider = makeProvider();
+      await pumpEnvCheck(tester, provider);
+      await provider.startForFile(File('/tmp/demo.mp4'));
+      await tester.pumpAndSettle();
+      expect(nextButtonTop(tester), lessThan(400));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('内容超高（三工具行+错误横幅）下一步仍固定底部可见', (tester) async {
+      tester.view.physicalSize = const Size(500, 400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final provider = makeProvider();
+      await pumpEnvCheck(tester, provider);
+      // URL 源 → yt-dlp 也必装，3 个工具行 + 错误横幅令内容远超视口
+      await provider.startForUrl('https://example.com/v.mp4');
+      provider
+        ..errorMessage = '模型下载失败'
+        ..errorDetail = 'Exception: DioException [bad response]: 404';
+      provider.notifyListeners();
+      await tester.pumpAndSettle();
+      expect(find.byType(ToolStatusRow), findsNWidgets(3));
+      expect(nextButtonTop(tester), lessThan(400));
+      expect(tester.takeException(), isNull);
     });
   });
 }
