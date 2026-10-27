@@ -21,6 +21,7 @@ import '../providers/knowledge_base_provider.dart';
 import '../models/note.dart';
 import '../models/category.dart';
 import '../services/clipboard_service.dart';
+import '../widgets/hover_hint.dart';
 import '../widgets/url_input_dialog.dart';
 import '../widgets/search_dialog.dart';
 import '../widgets/media_import/media_import_dialog.dart';
@@ -939,9 +940,8 @@ class _HomeScreenState extends State<HomeScreen> with ClipboardListener {
                     PopupMenuItem(
                       value: 'new',
                       height: 40,
-                      child: Tooltip(
+                      child: HoverHint(
                         message: t.home_hintNew,
-                        preferBelow: false,
                         child: Row(
                           children: [
                             Icon(
@@ -968,9 +968,8 @@ class _HomeScreenState extends State<HomeScreen> with ClipboardListener {
                     PopupMenuItem(
                       value: 'url',
                       height: 40,
-                      child: Tooltip(
+                      child: HoverHint(
                         message: t.home_hintWebclip,
-                        preferBelow: false,
                         child: Row(
                           children: [
                             Icon(
@@ -997,9 +996,8 @@ class _HomeScreenState extends State<HomeScreen> with ClipboardListener {
                     PopupMenuItem(
                       value: 'file',
                       height: 40,
-                      child: Tooltip(
+                      child: HoverHint(
                         message: t.home_hintFile,
-                        preferBelow: false,
                         child: Row(
                           children: [
                             Icon(
@@ -1026,9 +1024,8 @@ class _HomeScreenState extends State<HomeScreen> with ClipboardListener {
                     PopupMenuItem(
                       value: 'video',
                       height: 40,
-                      child: Tooltip(
+                      child: HoverHint(
                         message: t.home_hintVideo,
-                        preferBelow: true,
                         child: Row(
                           children: [
                             Icon(
