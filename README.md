@@ -66,6 +66,21 @@
 - **收藏功能**：快速标记重要笔记
 - **AI智能**：AI智能建议、关键词提取和摘要生成
 
+### 🎬 视频转笔记（v2.0.0 新增）
+
+- **一站式转换**：粘贴视频链接或选择本地音视频文件，自动完成 下载 → 音频提取 → 本地转录 → AI 格式化整理，生成结构化笔记
+- **分步向导**：环境检查 → 参数确认 → 进度展示，状态一目了然；下载实时显示速度 / 进度百分比 / 预计剩余时间，中途关闭向导自动转后台继续
+- **本地 whisper.cpp 转录**：三档开源 Whisper 模型按需选用（base 约 150MB / medium 约 1.6GB / large-v3-turbo 约 1.7GB），根据内存自动推荐档位，语音识别完全在本地离线完成
+- **内容优化强度三档**：高保真 / 平衡 / 逐字稿，配合关键时间戳开关；逐字稿档完全不调用 AI
+- **工具全自动管理**：ffmpeg、yt-dlp、whisper.cpp 缺什么补什么，支持一键安装、卸载、静默新版本检查与一键更新，设置页「视频转笔记」Tab 集中管理
+- **多语言识别**：自动检测或手动指定音频语言，界面支持简体中文 / 繁体中文 / English / Русский
+
+> 💡 **提醒**
+> - 首次使用会按需下载 ffmpeg / yt-dlp / whisper.cpp 等运行工具与所选 Whisper 模型，需要一定磁盘空间和网络时间，请保持网络畅通
+> - 转录在本地进行，音频内容不会上传；「高保真 / 平衡」档的格式化整理会经由你在应用内配置的 AI 服务商处理
+> - 转录速度取决于本机 CPU 性能与模型档位，长视频建议先用 base 档快速体验
+> - macOS 首次启动 whisper-cli 等工具如被系统安全机制拦截，请在「系统设置 → 隐私与安全性」中允许
+
 ### 🤖 Cici（茜茜）智能 Agent 助手
 
 - **对话式 AI 助手**：基于你的笔记知识库进行智能问答
@@ -275,6 +290,15 @@ open-note/
 
 - 详见 [LICENSE-MIT](LICENSE-MIT)
 - 详见 [LICENSE-APACHE](LICENSE-APACHE)
+
+## 🙏 致谢
+
+OpenNote 的「视频转笔记」能力建立在以下优秀开源项目之上，谨向各项目的开发者与社区致以诚挚感谢：
+
+- [FFmpeg](https://ffmpeg.org/) — 音视频处理领域的事实标准多媒体框架，本应用的音频提取能力依赖它
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) — 功能强大的视频下载命令行工具，支撑各大视频平台的链接解析与媒体下载
+- [whisper.cpp](https://github.com/ggml-org/whisper.cpp) — Georgi Gerganov 开发的高性能 Whisper C/C++ 推理实现，让语音识别得以在本地设备上离线运行
+- [OpenAI Whisper](https://github.com/openai/whisper) — Whisper 开源语音识别模型，本应用使用的 GGML 格式模型文件来自 [ggerganov/whisper.cpp](https://huggingface.co/ggerganov/whisper.cpp) Hugging Face 仓库
 
 ---
 
