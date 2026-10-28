@@ -62,7 +62,7 @@
 - **标签系统**：灵活智能的标签创建、推荐和管理
 - **网页提取**：输入URL自动提取正文并转为笔记
 - **笔记导入导出**：现已支持多种格式的笔记导入、导出
-- **多渠道创建和来源追踪**：支持手动创建、剪贴板粘贴、URL 提取、文件导入四种来源
+| **多渠道创建和来源追踪**：支持手动创建、剪贴板粘贴、URL 提取（网页剪报）、文件导入、音视频转换五种来源
 - **收藏功能**：快速标记重要笔记
 - **AI智能**：AI智能建议、关键词提取和摘要生成
 
@@ -92,7 +92,7 @@
   | 🔍 搜索 | 关键词搜索、标题搜索、向量语义搜索 |
   | 📖 读取 | 读取笔记内容、获取笔记格式 |
   | ✏️ 编辑 | 编辑笔记内容、修改基本信息 |
-  | ➕ 创建  | 新建笔记、从 URL 自动抓取创建 |
+  | ➕ 创建  | 新建笔记、网页剪报（从 URL 自动抓取创建） |
   | 🗑️ 删除 | 删除笔记 |
   | 🔀 合并 | 合并多篇笔记 |
   | 📊 列表 | 最近笔记、分类浏览、标签浏览 |
@@ -207,6 +207,7 @@ OpenNote 预设支持多种 AI 服务商，开箱即用：
 | **AI 服务**         | OpenAI 兼容 API / Anthropic / Ollama 等                     |
 | **向量数据库**         | ChromaDB (Embedding 服务)                                  |
 | **RAG Embedding** | ONNX Runtime (本地) 开源`embeddinggemma-300m`文本嵌入模型          |
+| **媒体引擎 / 转录**     | FFmpeg · yt-dlp · whisper.cpp（本地离线推理）                  |
 | **编辑器**           | flutter_quill, markdown_editor_plus, flutter_code_editor |
 | **Python 服务**     | FastAPI, Uvicorn, ChromaDB, ONNX Runtime                 |
 | **CI/CD**         | GitHub Actions                                           |
@@ -249,10 +250,12 @@ open-note/
 │   │   │   ├── skill_registry.dart
 │   │   │   ├── skill_executor.dart
 │   │   │   └── skills/           # 21 个具体技能实现
+│   │   ├── media/                # 媒体引擎（下载·转录·工具管理）
 │   │   └── prompts/              # AI 提示词模板
 │   ├── widgets/                  # UI 组件 (100+)
 │   │   ├── ai/cici/              # Cici AI 助手面板
 │   │   ├── editors/              # 4 种编辑器组件
+│   │   ├── media_import/         # 视频转笔记分步向导
 │   │   ├── category/             # 分类相关组件
 │   │   ├── navigation/           # 导航组件
 │   │   ├── onboarding/           # 新用户引导
