@@ -31,7 +31,7 @@ class _OnboardingGuideWidgetState extends State<OnboardingGuideWidget> {
   AIProviderTemplate? _selectedTemplate;
 
   void _nextPage() {
-    if (_currentPage < 8) {
+    if (_currentPage < 9) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -107,6 +107,11 @@ class _OnboardingGuideWidgetState extends State<OnboardingGuideWidget> {
                   onSkip: widget.onSkip,
                 ),
                 OnboardingPageFeature(
+                  imagePath: 'assets/images/welcome/video_transcription.png',
+                  onNext: _nextPage,
+                  onSkip: widget.onSkip,
+                ),
+                OnboardingPageFeature(
                   imagePath: 'assets/images/welcome/ai_providers.png',
                   onNext: _nextPage,
                   onSkip: widget.onSkip,
@@ -123,7 +128,7 @@ class _OnboardingGuideWidgetState extends State<OnboardingGuideWidget> {
                 OnboardingPageComplete(
                   onComplete: widget.onComplete,
                   onReturnToConfig: () {
-                    _pageController.jumpToPage(7);
+                    _pageController.jumpToPage(8);
                   },
                 ),
               ],
@@ -161,7 +166,7 @@ class _OnboardingGuideWidgetState extends State<OnboardingGuideWidget> {
       padding: EdgeInsets.symmetric(horizontal: 24),
       child: Row(
         children: [
-          if (_currentPage > 0 && _currentPage < 8)
+          if (_currentPage > 0 && _currentPage < 9)
             TextButton(
               onPressed: _previousPage,
               child: Text(
@@ -181,7 +186,7 @@ class _OnboardingGuideWidgetState extends State<OnboardingGuideWidget> {
           Spacer(),
           if (_currentPage == 0)
             SizedBox(width: 80)
-          else if (_currentPage >= 1 && _currentPage <= 5)
+          else if (_currentPage >= 1 && _currentPage <= 6)
             TextButton(
               onPressed: _nextPage,
               child: Text(
@@ -192,7 +197,7 @@ class _OnboardingGuideWidgetState extends State<OnboardingGuideWidget> {
                 ),
               ),
             )
-          else if (_currentPage == 8)
+          else if (_currentPage == 9)
             SizedBox(width: 80)
           else
             SizedBox(width: 80),
@@ -205,7 +210,7 @@ class _OnboardingGuideWidgetState extends State<OnboardingGuideWidget> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
-      children: List.generate(9, (index) {
+      children: List.generate(10, (index) {
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 4),
           width: 8,
