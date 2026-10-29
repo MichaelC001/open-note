@@ -351,13 +351,24 @@ void main() {
           MediaImportProvider.uninstallPlan(MediaToolKind.ffmpeg,
               brewPath: '/brew', isMac: false, isWin: false), isNull);
     });
-    test('windows：仅 whisper-cli 有 winget 计划', () {
-      expect(
-          MediaImportProvider.uninstallPlan(MediaToolKind.whisperCli,
-              isMac: false, isWin: true)!.executable, 'winget');
+    test('windows：仅 whisper-cli 有 winget 计划（需绝对路径）', () {
+      const winget = r'C:\Users\a\AppData\Local\Microsoft\WindowsApps\winget.exe';
+      final plan = MediaImportProvider.uninstallPlan(MediaToolKind.whisperCli,
+          wingetPath: winget, isMac: false, isWin: true);
+      expect(plan!.executable, winget);
+      expect(plan.args.first, 'uninstall');
+      expect(plan.args.join(' '), contains('ggml.whisper-cpp'));
       expect(
           MediaImportProvider.uninstallPlan(MediaToolKind.ffmpeg,
-              isMac: false, isWin: true), isNull);
+              wingetPath: winget, isMac: false, isWin: true), isNull);
+    });
+    test('windows：wingetPath 为空 -> null（回退指引）', () {
+      expect(
+          MediaImportProvider.uninstallPlan(MediaToolKind.whisperCli,
+              wingetPath: null, isMac: false, isWin: true), isNull);
+      expect(
+          MediaImportProvider.uninstallPlan(MediaToolKind.whisperCli,
+              wingetPath: '', isMac: false, isWin: true), isNull);
     });
   });
 

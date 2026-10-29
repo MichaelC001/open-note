@@ -504,12 +504,11 @@ class MediaImportProvider extends ChangeNotifier {
 
   /// 一键自动安装（macOS=brew / Windows=winget，仅 whisperCli 支持）。
   Future<void> autoInstallTool(MediaToolKind kind) async {
-    final brewPath = Platform.isMacOS ? await brewPathResolver() : null;
-    final wingetPath = Platform.isWindows ? await wingetPathResolver() : null;
+    final pkgPath = await _resolvePkgManagerPath();
     final plan = MediaToolService.autoInstallPlan(
       kind,
-      brewPath: brewPath,
-      wingetPath: wingetPath,
+      brewPath: pkgPath,
+      wingetPath: pkgPath,
       isMac: Platform.isMacOS,
       isWin: Platform.isWindows,
     );
@@ -550,6 +549,7 @@ class MediaImportProvider extends ChangeNotifier {
   static InstallerPlan? uninstallPlan(
     MediaToolKind kind, {
     String? brewPath,
+    String? wingetPath,
     required bool isMac,
     required bool isWin,
   }) {
@@ -563,10 +563,18 @@ class MediaImportProvider extends ChangeNotifier {
       return InstallerPlan(brewPath, ['uninstall', '-q', name]);
     }
     if (isWin && kind == MediaToolKind.whisperCli) {
-      return const InstallerPlan('winget', [
+      if (wingetPath == null || wingetPath.isEmpty) return null;
+      return InstallerPlan(wingetPath, [
         'uninstall', '--id', 'ggml.whisper-cpp', '-e', '--disable-interactivity',
       ]);
     }
+    return null;
+  }
+
+  /// 当前平台包管理器绝对路径（mac=brew / win=winget，其余 null）。
+  Future<String?> _resolvePkgManagerPath() async {
+    if (Platform.isMacOS) return brewPathResolver();
+    if (Platform.isWindows) return wingetPathResolver();
     return null;
   }
 
@@ -588,16 +596,19 @@ class MediaImportProvider extends ChangeNotifier {
         final dir = Directory(await toolService.toolDir(kind));
         if (dir.existsSync()) dir.deleteSync(recursive: true);
       } else {
-        final brewPath = Platform.isMacOS ? await brewPathResolver() : null;
+        final pkgPath = await _resolvePkgManagerPath();
         final plan = uninstallPlan(
           kind,
-          brewPath: brewPath,
+          brewPath: pkgPath,
+          wingetPath: pkgPath,
           isMac: Platform.isMacOS,
           isWin: Platform.isWindows,
         );
         if (plan == null) {
           errorMessage = '无法自动卸载';
-          errorDetail = '请使用对应包管理器卸载';
+          errorDetail = Platform.isWindows
+              ? '未检测到 winget（应用安装程序），请使用对应包管理器卸载'
+              : '请使用对应包管理器卸载';
           return;
         }
         final r = await installerRunner(plan.executable, plan.args);
