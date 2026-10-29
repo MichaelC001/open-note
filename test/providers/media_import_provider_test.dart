@@ -464,6 +464,41 @@ void main() {
     });
   });
 
+  group('downloadTool 磁盘预检分级', () {
+    test('diskNeedBytes：whisperCli 2.5GB，其余 200MB', () {
+      expect(MediaImportProvider.diskNeedBytes(MediaToolKind.whisperCli),
+          2560 * 1024 * 1024);
+      expect(MediaImportProvider.diskNeedBytes(MediaToolKind.ffmpeg),
+          200 * 1024 * 1024);
+      expect(MediaImportProvider.diskNeedBytes(MediaToolKind.ytDlp),
+          200 * 1024 * 1024);
+    });
+
+    test('whisperCli 1GB 可用被拦截（文案 2560 MB）；yt-dlp 维持 200MB 拦截线', () async {
+      final fake = _LowDiskDownloader()..freeBytes = 1024 * 1024 * 1024;
+      final p = MediaImportProvider(
+        toolService: _ReadyToolService(() async => tmp.path),
+        modelService: _AllModelsService(() async => tmp.path),
+        downloader: fake,
+      );
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+      p.toolStatuses[MediaToolKind.whisperCli] = const MediaToolStatus.missing(
+          MediaToolKind.whisperCli);
+      await p.downloadTool(MediaToolKind.whisperCli);
+      expect(p.errorMessage, '磁盘空间不足');
+      expect(p.errorDetail, contains('需要约 2560 MB'));
+      expect(fake.downloadCalls, 0, reason: '空间不足不应发起下载');
+
+      fake.freeBytes = 150 * 1024 * 1024;
+      p.toolStatuses[MediaToolKind.ytDlp] = const MediaToolStatus.missing(
+          MediaToolKind.ytDlp);
+      await p.downloadTool(MediaToolKind.ytDlp);
+      expect(p.errorMessage, '磁盘空间不足');
+      expect(p.errorDetail, contains('需要约 200 MB'));
+      expect(fake.downloadCalls, 0);
+    });
+  });
+
   group('ffmpeg 单文件下载 URL 回归', () {
     test('downloadTool(ffmpeg) 使用 ffmpeg-static 而非 yt-dlp URL', () async {
       final fake = _CapturingDownloader();
@@ -1015,6 +1050,28 @@ class _WritingDownloader extends MediaDownloader {
     CancelToken? cancelToken,
     String? expectedSha256,
   }) async {
+    await destFile.parent.create(recursive: true);
+    await destFile.writeAsString('NEW-BINARY');
+    return destFile;
+  }
+}
+
+/// 可编程磁盘剩余量（null 视为探测失败跳过预检），并记录 download 调用次数。
+class _LowDiskDownloader extends MediaDownloader {
+  int? freeBytes;
+  int downloadCalls = 0;
+  @override
+  Future<int?> freeDiskBytes(String path) async => freeBytes;
+  @override
+  Future<File> download(
+    String directUrl, {
+    required File destFile,
+    MediaDownloadSourceMode mode = MediaDownloadSourceMode.auto,
+    void Function(int received, int total)? onProgress,
+    CancelToken? cancelToken,
+    String? expectedSha256,
+  }) async {
+    downloadCalls++;
     await destFile.parent.create(recursive: true);
     await destFile.writeAsString('NEW-BINARY');
     return destFile;

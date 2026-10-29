@@ -322,6 +322,13 @@ class MediaImportProvider extends ChangeNotifier {
     _notify();
   }
 
+  /// 磁盘预检阈值分级：whisper Windows 资产现为 ~1.2GB CUDA 包，
+  /// 下载 zip + 解压峰值 ~2.4GB，按 2.5GB 预留；其余单文件工具 200MB。
+  static int diskNeedBytes(MediaToolKind kind) =>
+      kind == MediaToolKind.whisperCli
+          ? 2560 * 1024 * 1024
+          : 200 * 1024 * 1024;
+
   Future<void> downloadTool(MediaToolKind kind) async {
     // 操作占用守卫：下载/安装/finishing 收尾/卸载期间重复触发直接忽略
     //（防 finishing 窗口内重复点击「更新」造成二次下载/状态互踩）
@@ -344,14 +351,14 @@ class MediaImportProvider extends ChangeNotifier {
     _notify();
     try {
       final dir = await toolService.toolDir(kind);
-      // 磁盘空间预检：不足约 200MB 直接阻止下载
+      // 磁盘空间预检：按工具分级阈值，不足直接阻止下载
       final free = await downloader.freeDiskBytes(dir);
-      const needBytes = 200 * 1024 * 1024;
+      final needBytes = diskNeedBytes(kind);
       if (free != null && free < needBytes) {
         errorMessage = '磁盘空间不足';
         errorDetail =
-            '需要约 ${needBytes ~/ 1024 / 1024} MB，可用 '
-            '${free ~/ 1024 / 1024} MB';
+            '需要约 ${needBytes ~/ (1024 * 1024)} MB，可用 '
+            '${free ~/ (1024 * 1024)} MB';
         return;
       }
       _downloadCancel = CancelToken();
