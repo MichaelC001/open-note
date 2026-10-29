@@ -184,14 +184,25 @@ void main() {
         'whisper-bin-x64.zip',
         'whisper-blas-bin-Win32.zip',
         'whisper-blas-bin-x64.zip',
+        'whisper-cublas-11.8.0-bin-x64.zip',
+        'whisper-cublas-12.4.0-bin-x64.zip',
       ];
-      // 现行 release 无纯 CPU x64 包：选 cuda x64（内含 ggml-cpu-* dll，
-      // 无 NVIDIA 机器走 CPU 回退仍可运行）；旧纯 x64 包（无 win/cuda 标识）
-      // 为旧构建且校验不过，不再命中
+      // 纯 CPU x64 包（whisper-bin-x64.zip，无 'win' 子串）为第一优先：
+      // CUDA 包 ggml-cuda.dll 依赖 NVIDIA 驱动，无 N 卡进程无法启动（校验失败，
+      // 用户 Windows 实测）；blas/cublas/win32/adreno/opencl 排除
       expect(
           MediaDownloader.pickWhisperAsset(b5454Assets,
               isWindows: true, isMac: false, isArm: false),
-          'whisper-bin-win-cuda-11.8.0-x64.zip');
+          'whisper-bin-x64.zip');
+      expect(
+          MediaToolCandidates.whisper(b5454Assets,
+              isWindows: true, isMac: false, isArm: false),
+          [
+            'whisper-bin-x64.zip',
+            'whisper-bin-win-cuda-11.8.0-x64.zip',
+            'whisper-bin-win-cuda-12.4.0-x64.zip',
+          ],
+          reason: '纯 CPU x64 优先、cuda x64 兜底，blas/cublas/Win32 排除');
       expect(
           MediaDownloader.pickWhisperAsset(b5454Assets,
               isWindows: false, isMac: false, isArm: false),
@@ -210,32 +221,34 @@ void main() {
           isNull);
     });
 
-    test('candidates Windows x64：纯 CPU x64（win 标识）优先于 cuda x64', () {
+    test('candidates Windows x64：纯 CPU x64（无 win 子串）优先于 cuda x64', () {
       const names = [
         'whisper-bin-win-cuda-12.4.0-x64.zip',
-        'whisper-bin-win-cpu-x64.zip',
+        'whisper-bin-x64.zip',
       ];
       expect(
           MediaToolCandidates.whisper(names,
               isWindows: true, isMac: false, isArm: false),
-          ['whisper-bin-win-cpu-x64.zip', 'whisper-bin-win-cuda-12.4.0-x64.zip']);
+          ['whisper-bin-x64.zip', 'whisper-bin-win-cuda-12.4.0-x64.zip']);
     });
 
-    test('candidates Windows x64：cuda x64 兜底、blas 排除、旧纯 x64 不命中', () {
-      const names = [
-        'whisper-blas-bin-x64.zip',
-        'whisper-bin-x64.zip',
-        'whisper-bin-win-cuda-12.4.0-x64.zip',
-      ];
+    test('candidates Windows x64：仅 cuda 包时兜底命中，blas/cublas 排除', () {
       expect(
-          MediaToolCandidates.whisper(names,
+          MediaToolCandidates.whisper(
+              const ['whisper-bin-win-cuda-12.4.0-x64.zip'],
               isWindows: true, isMac: false, isArm: false),
-          ['whisper-bin-win-cuda-12.4.0-x64.zip']);
+          ['whisper-bin-win-cuda-12.4.0-x64.zip'],
+          reason: '无纯 CPU x64 包时 cuda x64 兜底');
       expect(
-          MediaToolCandidates.whisper(const ['whisper-bin-x64.zip'],
+          MediaToolCandidates.whisper(
+              const [
+                'whisper-blas-bin-x64.zip',
+                'whisper-cublas-12.4.0-bin-x64.zip',
+                'whisper-bin-Win32.zip',
+              ],
               isWindows: true, isMac: false, isArm: false),
           isEmpty,
-          reason: '旧纯 x64 包无 win/cuda 标识，不再回退命中');
+          reason: 'cublas 含 blas 子串被 bad 正则覆盖；Win32 无 x64 不命中');
     });
 
     test('candidates Windows ARM：cpu arm64 优先、cuda arm64 兜底、adreno/opencl 排除', () {

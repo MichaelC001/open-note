@@ -254,21 +254,20 @@ class _DigestConsumer implements Sink<crypto.Digest> {
 class MediaToolCandidates {
   static List<String> whisper(List<String> names,
       {required bool isWindows, required bool isMac, required bool isArm}) {
-    // cuda 不进主排除（cuda 包内含 ggml-cpu-* dll，无 NVIDIA 机器走 CPU 回退
-    // 仍可运行），单独用于 x64/arm64 的优先级分层：非 cuda 优先、cuda 兜底。
-    // 旧纯 x64 包（whisper-bin-x64.zip，无 win/cuda 标识）为旧构建且校验不过，
-    // 两级均不命中。
+    // cuda 进主排除（CUDA 包 ggml-cuda.dll 依赖 NVIDIA 驱动，无 N 卡进程
+    // 无法启动 → 校验失败），单独作兜底层：无纯 CPU 包可用时仍可下载尝试。
+    // x64 主层不要求 'win' 子串——纯 CPU 包名为 whisper-bin-x64.zip。
     final bad =
-        RegExp(r'blas|win32|xcframework|adreno|cublas|vulkan|clblast|opencl|wasm|addon');
+        RegExp(r'cuda|blas|win32|xcframework|adreno|cublas|vulkan|clblast|opencl|wasm|addon');
     if (isWindows) {
       bool zipOk(String n) =>
           n.endsWith('.zip') &&
-          !bad.hasMatch(n) &&
           (isArm ? n.contains('arm64') : n.contains('x64'));
-      // 主优先级：非 cuda 包（x64 需含 'win'，arm64 需含 'cpu'）；兜底层仅 cuda 包，
-      // 两者皆非（如旧 whisper-bin-x64.zip）不命中
+      // 主优先级：非 bad 包（x64 即纯 CPU；arm64 需含 'cpu'）；兜底层仅 cuda 包，
+      // 两者皆非（blas/cublas/win32/adreno/opencl 等）不命中（cublas 含 blas 子串
+      // 已被 bad 覆盖）
       bool isMain(String n) =>
-          !n.contains('cuda') && (isArm ? n.contains('cpu') : n.contains('win'));
+          !bad.hasMatch(n) && (isArm ? n.contains('cpu') : true);
       final main = <String>[];
       final cuda = <String>[];
       for (final n in names) {
