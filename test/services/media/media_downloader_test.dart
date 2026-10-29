@@ -47,6 +47,34 @@ void main() {
           'ffmpeg-darwin-arm64');
       expect(mirrors, contains('https://gh-proxy.com/$ffmpegTaggedUrl'));
     });
+    test('huggingface 模型: direct 直连优先、失败回退 hf-mirror', () {
+      const hf =
+          'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin';
+      final urls = MediaDownloader.candidateUrls(hf, MediaDownloadSourceMode.direct);
+      expect(urls, [
+        hf,
+        'https://hf-mirror.com/ggerganov/whisper.cpp/resolve/main/ggml-base.bin'
+      ]);
+    });
+    test('huggingface 模型: mirror 镜像优先、直连兜底', () {
+      const hf =
+          'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin';
+      final urls = MediaDownloader.candidateUrls(hf, MediaDownloadSourceMode.mirror);
+      expect(urls, [
+        'https://hf-mirror.com/ggerganov/whisper.cpp/resolve/main/ggml-base.bin',
+        hf
+      ]);
+    });
+    test('github ffmpeg: direct 直连优先、npmmirror/github 镜像顺序不变', () {
+      final urls = MediaDownloader.candidateUrls(
+          ffmpegTaggedUrl, MediaDownloadSourceMode.direct);
+      expect(urls, [
+        ffmpegTaggedUrl,
+        'https://registry.npmmirror.com/-/binary/ffmpeg-static/b6.1.1/ffmpeg-darwin-arm64',
+        'https://gh-proxy.com/$ffmpegTaggedUrl',
+        'https://ghfast.top/$ffmpegTaggedUrl'
+      ]);
+    });
     test('huggingface 模型: auto 仍为 [直连, hf-mirror]', () {
       const hf = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin';
       final urls = MediaDownloader.candidateUrls(hf, MediaDownloadSourceMode.auto);
@@ -66,11 +94,16 @@ void main() {
       expect(urls.first, 'https://github.com/a/b');
       expect(urls.length, 3);
     });
-    test('direct：仅直连', () {
+    test('direct：直连优先、镜像兜底', () {
+      final urls = MediaDownloader.candidateUrls(
+          'https://github.com/a/b', MediaDownloadSourceMode.direct);
+      expect(urls.first, 'https://github.com/a/b');
       expect(
-          MediaDownloader.candidateUrls(
-              'https://github.com/a/b', MediaDownloadSourceMode.direct),
-          ['https://github.com/a/b']);
+          urls,
+          containsAllInOrder([
+            'https://gh-proxy.com/https://github.com/a/b',
+            'https://ghfast.top/https://github.com/a/b',
+          ]));
     });
     test('mirror：镜像在前、直连兜底', () {
       final urls = MediaDownloader.candidateUrls(

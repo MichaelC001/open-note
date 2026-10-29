@@ -36,6 +36,7 @@ class MediaImportProvider extends ChangeNotifier {
   final Future<String> Function(String prompt)? callAI;
   final Future<ProcessRunResult> Function(String, List<String>) installerRunner;
   final Future<String?> Function() brewPathResolver;
+  final Future<String?> Function() wingetPathResolver;
   final ToolUpdateService updateService;
   final DateTime Function() clock;
 
@@ -46,6 +47,7 @@ class MediaImportProvider extends ChangeNotifier {
     this.callAI,
     Future<ProcessRunResult> Function(String, List<String>)? installerRunner,
     Future<String?> Function()? brewPathResolver,
+    Future<String?> Function()? wingetPathResolver,
     ToolUpdateService? updateService,
     DateTime Function()? clock,
   }) : toolService = toolService ?? _defaultToolService(),
@@ -53,6 +55,7 @@ class MediaImportProvider extends ChangeNotifier {
        downloader = downloader ?? MediaDownloader(),
        installerRunner = installerRunner ?? _defaultInstallerRunner,
        brewPathResolver = brewPathResolver ?? _defaultBrewPathResolver,
+       wingetPathResolver = wingetPathResolver ?? _defaultWingetPathResolver,
         updateService = updateService ?? ToolUpdateService(),
         clock = clock ?? DateTime.now {
     // fire-and-forget：从持久化恢复「可更新」徽标（跨重启不丢，见 checkToolUpdates）
@@ -502,9 +505,11 @@ class MediaImportProvider extends ChangeNotifier {
   /// 一键自动安装（macOS=brew / Windows=winget，仅 whisperCli 支持）。
   Future<void> autoInstallTool(MediaToolKind kind) async {
     final brewPath = Platform.isMacOS ? await brewPathResolver() : null;
+    final wingetPath = Platform.isWindows ? await wingetPathResolver() : null;
     final plan = MediaToolService.autoInstallPlan(
       kind,
       brewPath: brewPath,
+      wingetPath: wingetPath,
       isMac: Platform.isMacOS,
       isWin: Platform.isWindows,
     );
@@ -512,7 +517,9 @@ class MediaImportProvider extends ChangeNotifier {
       errorMessage = '无法自动安装';
       errorDetail = Platform.isMacOS
           ? '未检测到 Homebrew，请按指引手动安装（终端执行 brew install whisper-cpp）'
-          : '当前平台不支持自动安装，请按指引手动安装';
+          : Platform.isWindows
+              ? '未检测到 winget（应用安装程序），请按指引手动安装'
+              : '当前平台不支持自动安装，请按指引手动安装';
       _notify();
       return;
     }
@@ -659,6 +666,13 @@ class MediaImportProvider extends ChangeNotifier {
 
   static Future<String?> _defaultBrewPathResolver() async {
     for (final path in MediaToolService.brewCandidatePaths()) {
+      if (File(path).existsSync()) return path;
+    }
+    return null;
+  }
+
+  static Future<String?> _defaultWingetPathResolver() async {
+    for (final path in MediaToolService.wingetCandidatePaths()) {
       if (File(path).existsSync()) return path;
     }
     return null;

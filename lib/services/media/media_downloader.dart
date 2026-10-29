@@ -57,7 +57,8 @@ class MediaDownloader {
     final mirrors = mirrorUrls(directUrl);
     switch (mode) {
       case MediaDownloadSourceMode.direct:
-        return [directUrl];
+        // direct/mirror 为「优先级」而非「排他」：直连优先，连接失败自动回退镜像
+        return [directUrl, ...mirrors];
       case MediaDownloadSourceMode.mirror:
         return [...mirrors, directUrl];
       case MediaDownloadSourceMode.auto:

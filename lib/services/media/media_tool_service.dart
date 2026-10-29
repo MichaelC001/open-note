@@ -236,6 +236,7 @@ class MediaToolService {
   static InstallerPlan? autoInstallPlan(
     MediaToolKind kind, {
     String? brewPath,
+    String? wingetPath,
     required bool isMac,
     required bool isWin,
   }) {
@@ -245,7 +246,8 @@ class MediaToolService {
       return InstallerPlan(brewPath, ['install', '-q', 'whisper-cpp']);
     }
     if (isWin) {
-      return const InstallerPlan('winget', [
+      if (wingetPath == null || wingetPath.isEmpty) return null;
+      return InstallerPlan(wingetPath, [
         'install',
         '--id',
         'ggml.whisper-cpp',
@@ -262,6 +264,15 @@ class MediaToolService {
   static List<String> brewCandidatePaths() => Platform.isMacOS
       ? ['/opt/homebrew/bin/brew', '/usr/local/bin/brew']
       : const [];
+
+  /// Windows winget 绝对路径（GUI 应用无 shell PATH，CreateProcess 解析不了
+  /// App Execution Alias，需按绝对路径探测；LOCALAPPDATA 缺失返回空）。
+  static List<String> wingetCandidatePaths() {
+    if (!Platform.isWindows) return const [];
+    final local = Platform.environment['LOCALAPPDATA'];
+    if (local == null || local.isEmpty) return const [];
+    return ['$local\\Microsoft\\WindowsApps\\winget.exe'];
+  }
 
   static String? parseFfmpegVersion(String stdout) =>
       RegExp(r'ffmpeg version (\S+)').firstMatch(stdout)?.group(1);

@@ -261,17 +261,43 @@ void main() {
       );
     });
 
-    test('Windows -> winget 静默安装 ggml.whisper-cpp', () {
+    test('Windows -> winget 静默安装 ggml.whisper-cpp（绝对路径）', () {
       final plan = MediaToolService.autoInstallPlan(
         MediaToolKind.whisperCli,
         brewPath: null,
+        wingetPath:
+            r'C:\Users\a\AppData\Local\Microsoft\WindowsApps\winget.exe',
         isMac: false,
         isWin: true,
       );
       expect(plan, isNotNull);
-      expect(plan!.executable, 'winget');
+      expect(
+          plan!.executable, r'C:\Users\a\AppData\Local\Microsoft\WindowsApps\winget.exe');
       expect(plan.args.join(' '), contains('ggml.whisper-cpp'));
       expect(plan.args.join(' '), contains('--disable-interactivity'));
+    });
+
+    test('Windows 但未找到 winget -> null（回退指引）', () {
+      expect(
+        MediaToolService.autoInstallPlan(
+          MediaToolKind.whisperCli,
+          brewPath: null,
+          wingetPath: null,
+          isMac: false,
+          isWin: true,
+        ),
+        isNull,
+      );
+    });
+
+    test('wingetCandidatePaths：Windows 展开 LOCALAPPDATA，非 Windows 返回空', () {
+      final paths = MediaToolService.wingetCandidatePaths();
+      if (Platform.isWindows) {
+        final local = Platform.environment['LOCALAPPDATA'];
+        expect(paths, ['$local\\Microsoft\\WindowsApps\\winget.exe']);
+      } else {
+        expect(paths, isEmpty);
+      }
     });
 
     test('Linux 不支持自动安装 -> null（保留指引）', () {
