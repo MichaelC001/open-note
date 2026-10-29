@@ -1842,6 +1842,9 @@ class TranslationsRu extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get media_guide_targetDir => 'Целевая папка';
 	@override String get media_guide_copy => 'Копировать';
 	@override String get media_guide_dirFailed => 'Не удалось получить';
+	@override String get media_model_guide_title => 'Ручная загрузка модели';
+	@override String get media_model_guide_stepDownload => 'Откройте ссылку в браузере и скачайте файл модели (при медленном соединении используйте зеркало)';
+	@override String get media_model_guide_stepPlace => 'Поместите файл в папку ниже, сохранив имя, затем нажмите «Обновить» для обнаружения';
 	@override String get media_env_background => 'Загрузка продолжается в фоне: Настройки → Видео в заметку.';
 	@override String get media_env_uninstall => 'Удалить';
 	@override String get media_env_finishing => 'Скачано · Установка…';

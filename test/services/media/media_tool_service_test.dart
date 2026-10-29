@@ -42,7 +42,7 @@ void main() {
 
       final svc = MediaToolService(
         resolveBaseDir: () async => tmp.path,
-        run: (exe, args) async {
+        run: (exe, args, {String? workingDirectory}) async {
           if (args.contains('-version')) return ok('ffmpeg version 7.1');
           return fail;
         },
@@ -56,7 +56,7 @@ void main() {
     test('自管缺失且 which 成功 -> systemPath', () async {
       final svc = MediaToolService(
         resolveBaseDir: () async => tmp.path,
-        run: (exe, args) async {
+        run: (exe, args, {String? workingDirectory}) async {
           if (exe == 'which') return ok('/usr/local/bin/ffmpeg\n');
           if (args.contains('-version')) return ok('ffmpeg version 6.0');
           return fail;
@@ -71,9 +71,35 @@ void main() {
     test('全部缺失 -> ready=false', () async {
       final svc = MediaToolService(
         resolveBaseDir: () async => tmp.path,
-        run: (exe, args) async => fail,
+        run: (exe, args, {String? workingDirectory}) async => fail,
       );
       expect((await svc.check(MediaToolKind.ytDlp)).ready, isFalse);
+    });
+
+    test('whisperCli 探测以 exe 所在目录为工作目录（dll 搜索保险）', () async {
+      final whisperDir = Directory('${tmp.path}/tools/whisper');
+      whisperDir.createSync(recursive: true);
+      final bin = File(
+        '${whisperDir.path}/whisper-cli${Platform.isWindows ? '.exe' : ''}',
+      );
+      bin.writeAsStringSync('');
+      if (!Platform.isWindows) {
+        await Process.run('chmod', ['+x', bin.path]);
+      }
+      String? capturedWd;
+      final svc = MediaToolService(
+        resolveBaseDir: () async => tmp.path,
+        run: (exe, args, {workingDirectory}) async {
+          if (args.contains('--help')) {
+            capturedWd = workingDirectory;
+            return ok('usage: whisper-cli [options] file');
+          }
+          return fail;
+        },
+      );
+      final st = await svc.check(MediaToolKind.whisperCli);
+      expect(st.ready, isTrue);
+      expect(capturedWd, whisperDir.path);
     });
   });
 
@@ -115,7 +141,7 @@ void main() {
       );
     });
 
-    test('whisper 安装时把同目录动态库一并平铺搬到 toolDir', () async {
+    test('whisper 安装时把 exe 同目录文件全部平铺搬到 toolDir（全量安装）', () async {
       final nested = Directory('${tmp.path}/extract2/build/bin');
       nested.createSync(recursive: true);
       final exeName = Platform.isWindows ? 'whisper-cli.exe' : 'whisper-cli';
@@ -132,7 +158,37 @@ void main() {
       expect(File('$toolDirPath/$exeName').existsSync(), isTrue);
       final libName = lib.uri.pathSegments.last;
       expect(File('$toolDirPath/$libName').existsSync(), isTrue);
-      expect(File('$toolDirPath/readme.txt').existsSync(), isFalse);
+      expect(File('$toolDirPath/readme.txt').existsSync(), isTrue,
+          reason: '全量安装：非库文件同样平铺复制');
+    });
+
+    test('whisper 全量安装：嵌套 Release/ 子目录 exe+dll+杂文件全部平铺且 exe 改名', () async {
+      final release = Directory('${tmp.path}/extract3/whisper-bin-x64/Release');
+      release.createSync(recursive: true);
+      final exeName = Platform.isWindows ? 'whisper-cli.exe' : 'whisper-cli';
+      final libExt = Platform.isWindows ? '.dll' : '.so';
+      File('${release.path}/$exeName').writeAsStringSync('exe');
+      File('${release.path}/ggml$libExt').writeAsStringSync('ggml');
+      File('${release.path}/whisper$libExt').writeAsStringSync('whisper');
+      File('${release.path}/BUILD-INFO.txt').writeAsStringSync('meta');
+      File('${tmp.path}/extract3/LICENSE').writeAsStringSync('mit');
+      final svc = MediaToolService(resolveBaseDir: () async => tmp.path);
+      final installed = await svc.installExtractedBinary(
+          '${tmp.path}/extract3', MediaToolKind.whisperCli);
+      expect(installed, isNotNull);
+      final toolDirPath = await svc.toolDir(MediaToolKind.whisperCli);
+      expect(File('$toolDirPath/$exeName').readAsStringSync(), 'exe');
+      for (final name in [
+        'ggml$libExt',
+        'whisper$libExt',
+        'BUILD-INFO.txt',
+        'LICENSE',
+      ]) {
+        expect(File('$toolDirPath/$name').existsSync(), isTrue, reason: name);
+      }
+      expect(Directory('$toolDirPath/Release').existsSync(), isFalse,
+          reason: '子目录结构不带入 toolDir（平铺）');
+      expect(Directory('$toolDirPath/whisper-bin-x64').existsSync(), isFalse);
     });
   });
 
@@ -156,7 +212,7 @@ void main() {
 
     MediaToolService makeSvc() => MediaToolService(
           resolveBaseDir: () async => tmp.path,
-          run: (exe, args) async {
+          run: (exe, args, {String? workingDirectory}) async {
             if (!args.contains('-version')) return fail;
             runCount++;
             return ok('ffmpeg version 7.1');

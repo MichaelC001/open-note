@@ -241,6 +241,21 @@ class MediaImportService {
   static Future<String> _neverCall(String p) async =>
       throw UnsupportedError('fallback only');
 
+  /// yt-dlp 下载参数（纯函数，供直测）；[ffmpegPath] 就绪时传入，
+  /// 防未来 bv+ba 分离流需要合成。
+  static List<String> ytDlpArgs({required String url, String? ffmpegPath}) => [
+        '--no-playlist',
+        '--newline',
+        '-f',
+        'ba/b',
+        '-o',
+        '%(title).80s [%(id)s].%(ext)s',
+        '--print',
+        'after_move:filepath',
+        if (ffmpegPath != null) ...['--ffmpeg-location', ffmpegPath],
+        url,
+      ];
+
   Future<File> _acquire(
     MediaImportRequest req,
     Directory workDir,
@@ -255,22 +270,27 @@ class MediaImportService {
     if (!yt.ready || yt.path == null) {
       throw const MediaImportException('yt-dlp 未安装，请先在环境检查中安装');
     }
-    final process = await Process.start(yt.path!, [
-      '--no-playlist',
-      '--newline',
-      '-f',
-      'ba/b',
-      '-o',
-      '%(title).80s [%(id)s].%(ext)s',
-      '--print',
-      'after_move:filepath',
-      url,
-    ], workingDirectory: workDir.path);
+    final ff = await toolService.check(MediaToolKind.ffmpeg);
+    // PyInstaller 产物在 Windows 管道下默认 GBK 输出，强制 UTF-8 避免
+    // utf8 解码残缺/丢 --print 行；须合并系统环境（PATH/SYSTEMROOT 等不可丢）
+    final env = {
+      ...Platform.environment,
+      'PYTHONUTF8': '1',
+      'PYTHONIOENCODING': 'utf-8',
+    };
+    final process = await Process.start(
+      yt.path!,
+      ytDlpArgs(url: url, ffmpegPath: ff.ready ? ff.path : null),
+      workingDirectory: workDir.path,
+      environment: env,
+    );
     _active.add(process);
+    // allowMalformed：异常字节替换为 U+FFFD，不中断行监听
+    final decoder = const Utf8Codec(allowMalformed: true).decoder;
     final sbErr = StringBuffer();
     String? lastPlainLine;
     process.stdout
-        .transform(utf8.decoder)
+        .transform(decoder)
         .transform(const LineSplitter())
         .listen((line) {
           if (line.trim().isEmpty) return;
@@ -281,7 +301,7 @@ class MediaImportService {
           }
           if (!line.startsWith('[')) lastPlainLine = line.trim();
         });
-    process.stderr.transform(utf8.decoder).listen(sbErr.write);
+    process.stderr.transform(decoder).listen(sbErr.write);
     final code = await process.exitCode;
     _active.remove(process);
     _ensureAlive();

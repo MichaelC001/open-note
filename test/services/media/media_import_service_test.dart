@@ -67,6 +67,34 @@ void main() {
         '我的视频 [abc]');
   });
 
+  group('ytDlpArgs', () {
+    test('不含 ffmpegPath：不追加 --ffmpeg-location，url 收尾', () {
+      final args = MediaImportService.ytDlpArgs(url: 'https://youtu.be/abc');
+      expect(args, [
+        '--no-playlist',
+        '--newline',
+        '-f',
+        'ba/b',
+        '-o',
+        '%(title).80s [%(id)s].%(ext)s',
+        '--print',
+        'after_move:filepath',
+        'https://youtu.be/abc',
+      ]);
+    });
+
+    test('含 ffmpegPath：在 url 前追加 --ffmpeg-location', () {
+      final args = MediaImportService.ytDlpArgs(
+          url: 'https://youtu.be/abc', ffmpegPath: '/usr/local/bin/ffmpeg');
+      expect(args.last, 'https://youtu.be/abc');
+      final i = args.indexOf('--ffmpeg-location');
+      expect(i, greaterThanOrEqualTo(0));
+      expect(args[i + 1], '/usr/local/bin/ffmpeg');
+      expect(args.getRange(0, i),
+          containsAllInOrder(['--print', 'after_move:filepath']));
+    });
+  });
+
   test('本地 WAV 全流程：阶段推进/AI 格式化/临时目录清理', () async {
     final src = File('${tmp.path}/src.wav');
     src.writeAsBytesSync(List<int>.filled(44 + 32000 * 2, 0));

@@ -81,7 +81,7 @@ class EnvCheckStep extends StatelessWidget {
                         context.read<MediaImportProvider>().downloadTool(kind),
                   ),
                 const Divider(height: 24),
-                const ModelList(),
+                ModelList(modelService: p.modelService),
               ],
             ),
           ),

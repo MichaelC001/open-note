@@ -185,10 +185,13 @@ void main() {
         'whisper-blas-bin-Win32.zip',
         'whisper-blas-bin-x64.zip',
       ];
+      // 现行 release 无纯 CPU x64 包：选 cuda x64（内含 ggml-cpu-* dll，
+      // 无 NVIDIA 机器走 CPU 回退仍可运行）；旧纯 x64 包（无 win/cuda 标识）
+      // 为旧构建且校验不过，不再命中
       expect(
           MediaDownloader.pickWhisperAsset(b5454Assets,
               isWindows: true, isMac: false, isArm: false),
-          'whisper-bin-x64.zip');
+          'whisper-bin-win-cuda-11.8.0-x64.zip');
       expect(
           MediaDownloader.pickWhisperAsset(b5454Assets,
               isWindows: false, isMac: false, isArm: false),
@@ -205,6 +208,51 @@ void main() {
           MediaDownloader.pickWhisperAsset(['unrelated.zip'],
               isWindows: true, isMac: false, isArm: false),
           isNull);
+    });
+
+    test('candidates Windows x64：纯 CPU x64（win 标识）优先于 cuda x64', () {
+      const names = [
+        'whisper-bin-win-cuda-12.4.0-x64.zip',
+        'whisper-bin-win-cpu-x64.zip',
+      ];
+      expect(
+          MediaToolCandidates.whisper(names,
+              isWindows: true, isMac: false, isArm: false),
+          ['whisper-bin-win-cpu-x64.zip', 'whisper-bin-win-cuda-12.4.0-x64.zip']);
+    });
+
+    test('candidates Windows x64：cuda x64 兜底、blas 排除、旧纯 x64 不命中', () {
+      const names = [
+        'whisper-blas-bin-x64.zip',
+        'whisper-bin-x64.zip',
+        'whisper-bin-win-cuda-12.4.0-x64.zip',
+      ];
+      expect(
+          MediaToolCandidates.whisper(names,
+              isWindows: true, isMac: false, isArm: false),
+          ['whisper-bin-win-cuda-12.4.0-x64.zip']);
+      expect(
+          MediaToolCandidates.whisper(const ['whisper-bin-x64.zip'],
+              isWindows: true, isMac: false, isArm: false),
+          isEmpty,
+          reason: '旧纯 x64 包无 win/cuda 标识，不再回退命中');
+    });
+
+    test('candidates Windows ARM：cpu arm64 优先、cuda arm64 兜底、adreno/opencl 排除', () {
+      const names = [
+        'whisper-bin-win-cuda-13.4-arm64.zip',
+        'whisper-bin-win-opencl-adreno-arm64.zip',
+        'whisper-bin-win-cpu-arm64.zip',
+      ];
+      expect(
+          MediaToolCandidates.whisper(names,
+              isWindows: true, isMac: false, isArm: true),
+          ['whisper-bin-win-cpu-arm64.zip', 'whisper-bin-win-cuda-13.4-arm64.zip']);
+      expect(
+          MediaToolCandidates.whisper(const ['whisper-bin-win-cuda-13.4-arm64.zip'],
+              isWindows: true, isMac: false, isArm: true),
+          ['whisper-bin-win-cuda-13.4-arm64.zip'],
+          reason: '仅 cuda arm64 时兜底命中');
     });
   });
 

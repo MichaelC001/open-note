@@ -41,7 +41,8 @@ class MediaToolStatus {
 }
 
 class MediaToolService {
-  final Future<ProcessRunResult> Function(String, List<String>) run;
+  final Future<ProcessRunResult> Function(String, List<String>,
+      {String? workingDirectory}) run;
   final Future<String> Function() resolveBaseDir;
   final Future<Map<String, String>?> Function()? cacheReader;
   final Future<void> Function(Map<String, String> map)? cacheWriter;
@@ -50,7 +51,9 @@ class MediaToolService {
   bool _cacheLoaded = false;
 
   MediaToolService({
-    Future<ProcessRunResult> Function(String, List<String>)? run,
+    Future<ProcessRunResult> Function(String, List<String>,
+            {String? workingDirectory})?
+        run,
     Future<String> Function()? resolveBaseDir,
     this.cacheReader,
     this.cacheWriter,
@@ -208,11 +211,16 @@ class MediaToolService {
   Future<MediaToolStatus?> _verify(
       MediaToolKind kind, String path, MediaToolSource source) async {
     try {
+      // whisperCli 探测以 exe 所在目录为工作目录：Windows dll 与 exe 同目录，
+      // 从应用内启动时 PATH 无该目录，dll 搜索需工作目录兜底
       final r = await run(path, switch (kind) {
         MediaToolKind.ffmpeg => ['-version'],
         MediaToolKind.ytDlp => ['--version'],
         MediaToolKind.whisperCli => ['--help'],
-      });
+      },
+          workingDirectory: kind == MediaToolKind.whisperCli
+              ? File(path).parent.path
+              : null);
       if (r.exitCode != 0) return null;
       final version = switch (kind) {
         MediaToolKind.ffmpeg => parseFfmpegVersion(r.stdout),
@@ -283,8 +291,9 @@ class MediaToolService {
   }
 
   /// 从解压目录递归查找工具二进制，移动到统一 toolDir 并赋执行权限；找不到返回 null。
-  /// whisperCli 额外把二进制所在目录内的 *.dll/*.so*/*.dylib 平铺复制到 toolDir
-  /// （Windows 包与 ubuntu 包的动态库均与 whisper-cli 同目录，缺库则无法启动）。
+  /// whisperCli 全量安装：把解压目录下所有文件递归平铺复制到 toolDir（同名覆盖，
+  /// 跳过与目标 exe 同名的临时副本——旧 exe 由后续 dest 覆盖逻辑处理；新版 win 包
+  /// 的 dll 与 exe 可能分层，仅搬同级 dll 不保险）。
   Future<String?> installExtractedBinary(
       String extractedDir, MediaToolKind kind) async {
     final candidates = switch (kind) {
@@ -305,20 +314,18 @@ class MediaToolService {
     if (found == null) return null;
     final dirPath = await toolDir(kind);
     if (kind == MediaToolKind.whisperCli) {
-      await for (final e in found.parent.list(followLinks: false)) {
+      final foundName = found.uri.pathSegments.last;
+      await for (final e in Directory(extractedDir)
+          .list(recursive: true, followLinks: false)) {
         if (e is! File) continue;
         final name = e.uri.pathSegments.last;
-        final lower = name.toLowerCase();
-        final isLib = lower.endsWith('.dll') ||
-            lower.endsWith('.dylib') ||
-            lower.contains('.so');
-        if (!isLib) continue;
-        final libDest = File('$dirPath/$name');
-        if (await libDest.exists()) await libDest.delete();
+        if (name == foundName) continue;
+        final fileDest = File('$dirPath/$name');
+        if (await fileDest.exists()) await fileDest.delete();
         try {
-          await e.rename(libDest.path);
+          await e.rename(fileDest.path);
         } catch (_) {
-          await e.copy(libDest.path);
+          await e.copy(fileDest.path);
         }
       }
     }

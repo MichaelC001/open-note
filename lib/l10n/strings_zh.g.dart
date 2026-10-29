@@ -3147,6 +3147,15 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 	/// zh: '获取失败'
 	String get media_guide_dirFailed => '获取失败';
 
+	/// zh: '识别模型手动下载指引'
+	String get media_model_guide_title => '识别模型手动下载指引';
+
+	/// zh: '浏览器打开链接下载对应模型文件（直连不畅时用镜像）'
+	String get media_model_guide_stepDownload => '浏览器打开链接下载对应模型文件（直连不畅时用镜像）';
+
+	/// zh: '放入下方目录并保持文件名不变，点「重新检测」自动识别'
+	String get media_model_guide_stepPlace => '放入下方目录并保持文件名不变，点「重新检测」自动识别';
+
 	/// zh: '下载已在后台进行，可在 设置→视频转笔记 查看进度'
 	String get media_env_background => '下载已在后台进行，可在 设置→视频转笔记 查看进度';
 

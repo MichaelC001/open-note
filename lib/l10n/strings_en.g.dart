@@ -1848,6 +1848,9 @@ class TranslationsEn extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get media_guide_targetDir => 'Target folder';
 	@override String get media_guide_copy => 'Copy';
 	@override String get media_guide_dirFailed => 'Failed to load';
+	@override String get media_model_guide_title => 'Manual Model Download Guide';
+	@override String get media_model_guide_stepDownload => 'Open the link in your browser to download the model file (use the mirror if direct access is slow)';
+	@override String get media_model_guide_stepPlace => 'Place it in the folder below keeping the file name, then tap Refresh to detect it automatically';
 	@override String get media_env_background => 'Download continues in the background. Check Settings → Video to Note for progress.';
 	@override String get media_env_uninstall => 'Uninstall';
 	@override String get media_env_finishing => 'Downloaded · Installing…';

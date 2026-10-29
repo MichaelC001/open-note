@@ -4,40 +4,107 @@ import 'package:flutter/services.dart';
 
 import '../../l10n/strings.g.dart';
 import '../../services/media/media_tool_service.dart';
+import '../../services/media/whisper_model_service.dart';
 
-/// 手动安装指引对话框：内容可选中复制，关键段带独立复制按钮。
-/// 仅 whisperCli+Windows 追加下载页/目标目录/放置说明三段。
+/// 指引段：标题 / 链接列表 / 目标目录 / 说明，四要素均可选。
+class GuideSection {
+  final String? heading;
+  final List<String> links;
+  final String? dirLabel;
+  final Future<String?>? directory;
+  final String? note;
+
+  const GuideSection({
+    this.heading,
+    this.links = const [],
+    this.dirLabel,
+    this.directory,
+    this.note,
+  });
+}
+
+/// 手动指引对话框：内容可选中复制，关键段带独立复制按钮。
+/// 段列表模型泛化，工具安装与识别模型下载共用同一渲染。
 class MediaManualGuideDialog extends StatelessWidget {
-  final MediaToolKind kind;
-  final String guide;
-  final MediaToolService? toolService;
+  final String title;
+  final String? monoBody;
+  final List<GuideSection> sections;
 
   const MediaManualGuideDialog({
     super.key,
-    required this.kind,
-    required this.guide,
-    this.toolService,
+    required this.title,
+    this.monoBody,
+    this.sections = const [],
   });
-
-  static Future<void> show(
-    BuildContext context, {
-    required MediaToolKind kind,
-    required String guide,
-    MediaToolService? toolService,
-  }) =>
-      showDialog<void>(
-        context: context,
-        builder: (_) => MediaManualGuideDialog(
-          kind: kind,
-          guide: guide,
-          toolService: toolService,
-        ),
-      );
 
   static const _whisperReleasesUrl =
       'https://github.com/ggml-org/whisper.cpp/releases';
   static const _whisperMirrorUrl =
       'https://gh-proxy.com/https://github.com/ggml-org/whisper.cpp/releases';
+
+  /// 工具安装指引：首段为安装命令；仅 whisperCli+Windows 追加
+  /// 下载页/目标目录/放置说明段。
+  static Future<void> show(
+    BuildContext context, {
+    required MediaToolKind kind,
+    required String guide,
+    MediaToolService? toolService,
+  }) {
+    final t = Translations.of(context);
+    final isWindowsWhisper = kind == MediaToolKind.whisperCli &&
+        Theme.of(context).platform == TargetPlatform.windows;
+    return showDialog<void>(
+      context: context,
+      builder: (_) => MediaManualGuideDialog(
+        title: t.media_guide_title,
+        monoBody: guide,
+        sections: isWindowsWhisper
+            ? [
+                GuideSection(
+                  heading: t.media_guide_stepDownload,
+                  links: const [_whisperReleasesUrl, _whisperMirrorUrl],
+                ),
+                GuideSection(
+                  heading: t.media_guide_stepPlace,
+                  dirLabel: t.media_guide_targetDir,
+                  directory: toolService?.toolDir(kind),
+                  note: t.media_guide_stepRefresh,
+                ),
+              ]
+            : const [],
+      ),
+    );
+  }
+
+  /// 识别模型手动下载指引：镜像/官方直链 + 目标目录 + 放置说明。
+  static Future<void> showModel(
+    BuildContext context, {
+    required WhisperModelTier tier,
+    WhisperModelService? modelService,
+  }) {
+    final t = Translations.of(context);
+    final info = WhisperModelService.infoFor(tier);
+    return showDialog<void>(
+      context: context,
+      builder: (_) => MediaManualGuideDialog(
+        title: t.media_model_guide_title,
+        sections: [
+          GuideSection(
+            heading: t.media_model_guide_stepDownload,
+            links: [
+              WhisperModelService.modelUrl(info, mirror: true).toString(),
+              WhisperModelService.modelUrl(info, mirror: false).toString(),
+            ],
+          ),
+          GuideSection(
+            dirLabel: t.media_guide_targetDir,
+            directory: modelService?.modelsDir(),
+            note: t.media_model_guide_stepPlace,
+          ),
+        ],
+      ),
+    );
+  }
 
   void _copy(BuildContext context, String text) {
     Clipboard.setData(ClipboardData(text: text));
@@ -49,11 +116,9 @@ class MediaManualGuideDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Translations.of(context);
-    final isWindowsWhisper = kind == MediaToolKind.whisperCli &&
-        Theme.of(context).platform == TargetPlatform.windows;
     const mono = TextStyle(fontFamily: 'monospace', fontSize: 12);
     return AlertDialog(
-      title: Text(t.media_guide_title),
+      title: Text(title),
       content: SizedBox(
         width: 420,
         child: SingleChildScrollView(
@@ -62,35 +127,37 @@ class MediaManualGuideDialog extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                _copyableRow(context, Text(guide, style: mono)),
-                if (isWindowsWhisper) ...[
+                if (monoBody != null) ...[
+                  _copyableRow(context, Text(monoBody!, style: mono)),
                   const SizedBox(height: 16),
-                  Text(
-                    t.media_guide_stepDownload,
-                    style: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 4),
-                  _copyableRow(
-                      context, const Text(_whisperReleasesUrl, style: mono)),
-                  _copyableRow(
-                      context, const Text(_whisperMirrorUrl, style: mono)),
-                  const SizedBox(height: 16),
-                  Text(
-                    t.media_guide_stepPlace,
-                    style: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    t.media_guide_targetDir,
-                    style: const TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.w600),
-                  ),
-                  _targetDirRow(context, mono),
-                  const SizedBox(height: 16),
-                  Text(t.media_guide_stepRefresh,
-                      style: const TextStyle(fontSize: 13)),
+                ],
+                for (final (i, section) in sections.indexed) ...[
+                  if (i > 0) const SizedBox(height: 16),
+                  if (section.heading != null) ...[
+                    Text(
+                      section.heading!,
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 4),
+                  ],
+                  for (final link in section.links)
+                    _copyableRow(context, Text(link, style: mono)),
+                  if (section.dirLabel != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      section.dirLabel!,
+                      style: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                  if (section.directory != null)
+                    _targetDirRow(context, section.directory!, mono),
+                  if (section.note != null) ...[
+                    const SizedBox(height: 16),
+                    Text(section.note!,
+                        style: const TextStyle(fontSize: 13)),
+                  ],
                 ],
               ],
             ),
@@ -124,10 +191,11 @@ class MediaManualGuideDialog extends StatelessWidget {
   static String _childText(Widget child) =>
       child is Text ? (child.data ?? '') : '';
 
-  Widget _targetDirRow(BuildContext context, TextStyle mono) {
+  Widget _targetDirRow(
+      BuildContext context, Future<String?> future, TextStyle mono) {
     final t = Translations.of(context);
-    return FutureBuilder<String>(
-      future: toolService?.toolDir(kind),
+    return FutureBuilder<String?>(
+      future: future,
       builder: (context, snap) {
         final dir = snap.data;
         return Row(

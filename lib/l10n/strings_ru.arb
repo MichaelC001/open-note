@@ -2409,6 +2409,11 @@
   "media_guide_targetDir": "Целевая папка",
   "media_guide_copy": "Копировать",
   "media_guide_dirFailed": "Не удалось получить",
+  "media_model_guide_title": "Ручная загрузка модели",
+  "media_model_guide_stepDownload":
+      "Откройте ссылку в браузере и скачайте файл модели (при медленном соединении используйте зеркало)",
+  "media_model_guide_stepPlace":
+      "Поместите файл в папку ниже, сохранив имя, затем нажмите «Обновить» для обнаружения",
   "media_env_background": "Загрузка продолжается в фоне: Настройки → Видео в заметку.",
   "media_env_uninstall": "Удалить",
   "media_env_finishing": "Скачано · Установка…",

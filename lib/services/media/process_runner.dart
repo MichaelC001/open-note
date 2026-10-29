@@ -10,9 +10,11 @@ class ProcessRunResult {
 
 Future<ProcessRunResult> runCommand(
   String executable,
-  List<String> args,
-) async {
-  final result = await Process.run(executable, args);
+  List<String> args, {
+  String? workingDirectory,
+}) async {
+  final result = await Process.run(executable, args,
+      workingDirectory: workingDirectory);
   return ProcessRunResult(
     result.exitCode,
     result.stdout.toString(),

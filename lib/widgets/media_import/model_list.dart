@@ -7,12 +7,14 @@ import '../../providers/media_import_provider.dart';
 import '../../services/media/download_stats.dart';
 import '../../services/media/whisper_model_service.dart';
 import '../../theme/design_tokens.dart';
+import 'media_manual_guide_dialog.dart';
 import 'tool_status_row.dart';
 
 class ModelList extends StatelessWidget {
   final void Function(WhisperModelTier tier)? onDelete;
+  final WhisperModelService? modelService;
 
-  const ModelList({super.key, this.onDelete});
+  const ModelList({super.key, this.onDelete, this.modelService});
 
   @override
   Widget build(BuildContext context) {
@@ -21,9 +23,25 @@ class ModelList extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          t.media_env_model,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        Row(
+          children: [
+            Text(
+              t.media_env_model,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            const Spacer(),
+            IconButton(
+              icon: const Icon(Icons.help_outline),
+              tooltip: t.media_model_guide_title,
+              onPressed: modelService == null
+                  ? null
+                  : () => MediaManualGuideDialog.showModel(
+                        context,
+                        tier: p.selectedTier,
+                        modelService: modelService,
+                      ),
+            ),
+          ],
         ),
         const SizedBox(height: 4),
         for (final tier in WhisperModelTier.values)

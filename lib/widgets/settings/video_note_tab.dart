@@ -105,7 +105,10 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
             for (final kind in MediaToolKind.values)
               _toolRow(context, p, t, platformKey, kind),
             const Divider(height: 24),
-            ModelList(onDelete: (tier) => _confirmDeleteModel(context, p, tier)),
+            ModelList(
+              onDelete: (tier) => _confirmDeleteModel(context, p, tier),
+              modelService: p.modelService,
+            ),
             const SizedBox(height: 8),
             FutureBuilder<String>(
               future: _modelsDirFuture,
