@@ -25,6 +25,11 @@ class PythonServiceManager {
   String? _servicePath;
   ServiceCheckResult? _lastServiceCheckResult;
 
+  // 进程秒退快速失败：记录进程退出状态与 stderr 特征（binary 版本过旧）
+  bool _processExited = false;
+  int? _processExitCode;
+  bool _sawUnrecognizedArgs = false;
+
   bool get isRunning => _isRunning;
   bool get isPrepared => _isPrepared;
   String get baseUrl => _baseUrl;
@@ -302,6 +307,9 @@ class PythonServiceManager {
         args.addAll(['--model-dir', modelDir]);
       }
 
+      _processExited = false;
+      _processExitCode = null;
+      _sawUnrecognizedArgs = false;
       _pythonProcess = await Process.start(
         _servicePath!,
         args,
@@ -314,6 +322,8 @@ class PythonServiceManager {
       // 设置退出监听器（普通模式下可以正常访问 exitCode）
       _pythonProcess!.exitCode.then((code) {
         debugPrint('PythonService: 进程退出，代码: $code');
+        _processExited = true;
+        _processExitCode = code;
         _isRunning = false;
         _pythonProcess = null;
         _pythonPid = null;
@@ -329,6 +339,10 @@ class PythonServiceManager {
           .transform(const Utf8Codec(allowMalformed: true).decoder)
           .listen((data) {
             debugPrint('PythonService[stderr]: $data');
+            if (!_sawUnrecognizedArgs &&
+                data.contains('unrecognized arguments')) {
+              _sawUnrecognizedArgs = true;
+            }
           });
 
       // 等待 HTTP 服务可访问，组件初始化状态由状态轮询继续跟踪
@@ -430,6 +444,19 @@ class PythonServiceManager {
     final startTime = DateTime.now();
     int attempt = 0;
     while (DateTime.now().difference(startTime) < timeout) {
+      // 秒退快速失败：进程已退出则立即返回，不再空转等待 HTTP
+      if (_processExited) {
+        if (_sawUnrecognizedArgs) {
+          debugPrint(
+            'PythonService: embedding 服务二进制版本过旧，请重新构建：'
+            'scripts/build_embedding_service_windows.bat'
+            '（macOS 为 build_embedding_service_macos.sh）后重试',
+          );
+        } else {
+          debugPrint('PythonService: 服务进程提前退出 (代码 $_processExitCode)');
+        }
+        return false;
+      }
       attempt++;
       try {
         final response = await http

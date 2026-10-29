@@ -513,13 +513,19 @@ class MediaImportProvider extends ChangeNotifier {
       isWin: Platform.isWindows,
     );
     if (plan == null) {
+      // Windows：winget 缺失时自动降级便携版下载（whisperCli 链路完整：
+      // zip 下载+解压+dll 平铺）。下载期间 UI 进度条自解释；downloadTool
+      // 开头会清 toolHints，故提示必须在其完成后设置；失败时
+      // errorMessage/errorDetail 已展示，无需重复。
+      if (Platform.isWindows) {
+        await downloadTool(kind);
+        toolHints[kind] = '未检测到 winget（应用安装程序），已自动改用便携版下载';
+        return;
+      }
       errorMessage = '无法自动安装';
       errorDetail = Platform.isMacOS
           ? '未检测到 Homebrew，请按指引手动安装（终端执行 brew install whisper-cpp）'
-          : Platform.isWindows
-              ? '未检测到 winget（应用安装程序），请按指引手动安装；'
-                  '可从 Microsoft Store 安装“应用安装程序 (App Installer)”后重试'
-              : '当前平台不支持自动安装，请按指引手动安装';
+          : '当前平台不支持自动安装，请按指引手动安装';
       _notify();
       return;
     }
