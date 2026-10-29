@@ -2399,6 +2399,16 @@
   "@home_clipMedia": {
     "description": "剪贴板条从音视频中创建按钮"
   },
+  "media_guide_title": "Руководство по установке",
+  "media_guide_stepDownload":
+      "Откройте страницу релизов в браузере и скачайте zip для win-x64 (при медленном соединении используйте зеркальную ссылку)",
+  "media_guide_stepPlace":
+      "Распакуйте и поместите whisper-cli.exe (с DLL) в папку ниже",
+  "media_guide_stepRefresh":
+      "Вернитесь в приложение и нажмите значок обновления в правом верхнем углу — оно будет обнаружено автоматически",
+  "media_guide_targetDir": "Целевая папка",
+  "media_guide_copy": "Копировать",
+  "media_guide_dirFailed": "Не удалось получить",
   "media_env_background": "Загрузка продолжается в фоне: Настройки → Видео в заметку.",
   "media_env_uninstall": "Удалить",
   "media_env_finishing": "Скачано · Установка…",

@@ -3126,6 +3126,27 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 	/// zh: '从音视频中创建'
 	String get home_clipMedia => '从音视频中创建';
 
+	/// zh: '手动安装指引'
+	String get media_guide_title => '手动安装指引';
+
+	/// zh: '浏览器打开下载页，选择 win-x64 zip（直连不畅时用镜像链接）'
+	String get media_guide_stepDownload => '浏览器打开下载页，选择 win-x64 zip（直连不畅时用镜像链接）';
+
+	/// zh: '解压后将 whisper-cli.exe 及同目录 dll 放入下方目录'
+	String get media_guide_stepPlace => '解压后将 whisper-cli.exe 及同目录 dll 放入下方目录';
+
+	/// zh: '返回应用点击右上角刷新 ↻，将自动识别'
+	String get media_guide_stepRefresh => '返回应用点击右上角刷新 ↻，将自动识别';
+
+	/// zh: '目标目录'
+	String get media_guide_targetDir => '目标目录';
+
+	/// zh: '复制'
+	String get media_guide_copy => '复制';
+
+	/// zh: '获取失败'
+	String get media_guide_dirFailed => '获取失败';
+
 	/// zh: '下载已在后台进行，可在 设置→视频转笔记 查看进度'
 	String get media_env_background => '下载已在后台进行，可在 设置→视频转笔记 查看进度';
 

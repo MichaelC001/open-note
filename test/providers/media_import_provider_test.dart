@@ -918,6 +918,19 @@ void main() {
       expect(await MediaImportSettings().readUpdateAvailable(), isEmpty);
     });
   });
+
+  group('模型下载失败手动兜底（buildModelManualHint）', () {
+    test('组装手动下载提示：含文件名保持说明与模型目录', () {
+      final hint = MediaImportProvider.buildModelManualHint(
+        fileName: 'ggml-medium.bin',
+        modelsDir: '/tmp/models',
+      );
+      expect(hint, contains('手动下载'));
+      expect(hint, contains('ggml-medium.bin'));
+      expect(hint, contains('重新检测'));
+      expect(hint, contains('模型目录：/tmp/models'));
+    });
+  });
 }
 
 class _CountingFetcher {

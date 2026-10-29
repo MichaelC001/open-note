@@ -1835,6 +1835,13 @@ class TranslationsZhTw extends Translations with BaseTranslations<AppLocale, Tra
 	/// 剪贴板条从音视频中创建按钮
 	@override String get home_clipMedia => '從音訊視訊中建立';
 
+	@override String get media_guide_title => '手動安裝指引';
+	@override String get media_guide_stepDownload => '瀏覽器開啟下載頁，選擇 win-x64 zip（直連不暢時用鏡像連結）';
+	@override String get media_guide_stepPlace => '解壓縮後將 whisper-cli.exe 及同目錄 dll 放入下方目錄';
+	@override String get media_guide_stepRefresh => '返回應用點擊右上角重新整理 ↻，將自動識別';
+	@override String get media_guide_targetDir => '目標目錄';
+	@override String get media_guide_copy => '複製';
+	@override String get media_guide_dirFailed => '取得失敗';
 	@override String get media_env_background => '下載已在背景進行，可在 設定→影片轉筆記 查看進度';
 	@override String get media_env_uninstall => '解除安裝';
 	@override String get media_env_finishing => '下載完成 · 安裝中…';

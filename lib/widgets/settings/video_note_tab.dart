@@ -307,6 +307,7 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
               ? t.media_env_useManager
               : null),
       guide: installGuides[kind]![platformKey]!,
+      toolService: p.toolService,
       onAutoInstall: ToolStatusRow.canAutoInstall(kind, platformKey)
           ? () => p.autoInstallTool(kind)
           : null,

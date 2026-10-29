@@ -700,12 +700,23 @@ class MediaImportProvider extends ChangeNotifier {
     return null;
   }
 
+  /// 模型下载失败的手动兜底提示：提示浏览器下载 + 模型目录 + 文件名保持。
+  static String buildModelManualHint({
+    required String fileName,
+    required String modelsDir,
+  }) =>
+      '\n手动下载：用浏览器打开上方链接，下载后放入模型目录并将文件名保持为 '
+      '$fileName，然后点「重新检测」即可自动识别'
+      '\n模型目录：$modelsDir';
+
   Future<void> downloadSelectedModel() async {
     modelDownloading = true;
     modelDownloadStatus = const DownloadStatus();
     _modelTracker = DownloadSpeedTracker();
     errorMessage = null;
     _notify();
+    // fileName 在 try 外先取：catch 中 info 变量不可达
+    final fileName = WhisperModelService.infoFor(selectedTier).fileName;
     try {
       final info = WhisperModelService.infoFor(selectedTier);
       final modelsDir = await modelService.modelsDir();
@@ -735,7 +746,15 @@ class MediaImportProvider extends ChangeNotifier {
       downloadedTiers.add(selectedTier);
     } catch (e) {
       errorMessage = '模型下载失败';
-      errorDetail = e.toString();
+      // modelsDir 在 catch 中重新 await（try 内变量可能未达）
+      String modelsDir;
+      try {
+        modelsDir = await modelService.modelsDir();
+      } catch (_) {
+        modelsDir = '（获取失败）';
+      }
+      errorDetail =
+          '$e${buildModelManualHint(fileName: fileName, modelsDir: modelsDir)}';
     } finally {
       modelDownloading = false;
       _downloadCancel = null;

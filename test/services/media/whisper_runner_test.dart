@@ -31,6 +31,24 @@ void main() {
     expect(WhisperRunner.parseProgressSeconds('nothing'), isNull);
   });
 
+  test('buildArgs noGpu 追加 -ng', () {
+    expect(
+        WhisperRunner.buildArgs(
+            modelPath: 'm.bin', wavPath: 'a.wav', outPrefix: 'a', noGpu: true),
+        ['-m', 'm.bin', '-f', 'a.wav', '-oj', '-of', 'a', '-np', '-pp', '-ng']);
+  });
+
+  test('looksLikeGpuFailure 识别 Metal 后端失败', () {
+    expect(
+        WhisperRunner.looksLikeGpuFailure(
+            -6,
+            'ggml_metal_init: error: pre-allocated tensor (leaf_0) in a buffer '
+            '(MTL0) that cannot run the operation (NONE)'),
+        isTrue);
+    expect(WhisperRunner.looksLikeGpuFailure(1, 'some other error'), isFalse);
+    expect(WhisperRunner.looksLikeGpuFailure(0, ''), isFalse);
+  });
+
   test('parseProgressPercent 取最后一个百分比', () {
     expect(WhisperRunner.parseProgressPercent('[progress = 35%]'), 0.35);
     expect(

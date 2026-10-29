@@ -2407,6 +2407,13 @@
   "@home_clipMedia": {
     "description": "剪贴板条从音视频中创建按钮"
   },
+  "media_guide_title": "手动安装指引",
+  "media_guide_stepDownload": "浏览器打开下载页，选择 win-x64 zip（直连不畅时用镜像链接）",
+  "media_guide_stepPlace": "解压后将 whisper-cli.exe 及同目录 dll 放入下方目录",
+  "media_guide_stepRefresh": "返回应用点击右上角刷新 ↻，将自动识别",
+  "media_guide_targetDir": "目标目录",
+  "media_guide_copy": "复制",
+  "media_guide_dirFailed": "获取失败",
   "media_env_background": "下载已在后台进行，可在 设置→视频转笔记 查看进度",
   "media_env_uninstall": "卸载",
   "media_env_finishing": "下载完成 · 安装中…",

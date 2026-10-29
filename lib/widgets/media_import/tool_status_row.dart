@@ -1,12 +1,12 @@
 // lib/widgets/media_import/tool_status_row.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../l10n/strings.g.dart';
 import '../../services/media/download_stats.dart';
 import '../../services/media/media_tool_service.dart';
 import '../../services/media/tool_update_service.dart';
 import '../../theme/design_tokens.dart';
+import 'media_manual_guide_dialog.dart';
 
 const Map<MediaToolKind, Map<String, String>> installGuides = {
   MediaToolKind.ffmpeg: {
@@ -41,9 +41,11 @@ class ErrorBanner extends StatelessWidget {
         color: Colors.red.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Text(
-        '$message${detail == null ? '' : '\n$detail'}',
-        style: const TextStyle(fontSize: 12, color: Colors.red),
+      child: SelectionArea(
+        child: Text(
+          '$message${detail == null ? '' : '\n$detail'}',
+          style: const TextStyle(fontSize: 12, color: Colors.red),
+        ),
       ),
     );
   }
@@ -88,6 +90,7 @@ class ToolStatusRow extends StatelessWidget {
   final String? updateVersion;
   final bool checkingUpdate;
   final String guide;
+  final MediaToolService? toolService;
   final VoidCallback? onAutoInstall;
   final VoidCallback? onDownload;
   final VoidCallback? onUninstall;
@@ -105,6 +108,7 @@ class ToolStatusRow extends StatelessWidget {
     this.updateVersion,
     this.checkingUpdate = false,
     required this.guide,
+    this.toolService,
     this.onAutoInstall,
     this.onDownload,
     this.onUninstall,
@@ -237,16 +241,12 @@ class ToolStatusRow extends StatelessWidget {
                 IconButton(
                   icon: const Icon(Icons.help_outline),
                   tooltip: guide,
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: guide));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          Translations.of(context).media_env_copied,
-                        ),
-                      ),
-                    );
-                  },
+                  onPressed: () => MediaManualGuideDialog.show(
+                    context,
+                    kind: kind,
+                    guide: guide,
+                    toolService: toolService,
+                  ),
                 ),
               ],
             ),

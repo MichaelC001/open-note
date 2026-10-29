@@ -1835,6 +1835,13 @@ class TranslationsRu extends Translations with BaseTranslations<AppLocale, Trans
 	/// 剪贴板条从音视频中创建按钮
 	@override String get home_clipMedia => 'Создать из аудио/видео';
 
+	@override String get media_guide_title => 'Руководство по установке';
+	@override String get media_guide_stepDownload => 'Откройте страницу релизов в браузере и скачайте zip для win-x64 (при медленном соединении используйте зеркальную ссылку)';
+	@override String get media_guide_stepPlace => 'Распакуйте и поместите whisper-cli.exe (с DLL) в папку ниже';
+	@override String get media_guide_stepRefresh => 'Вернитесь в приложение и нажмите значок обновления в правом верхнем углу — оно будет обнаружено автоматически';
+	@override String get media_guide_targetDir => 'Целевая папка';
+	@override String get media_guide_copy => 'Копировать';
+	@override String get media_guide_dirFailed => 'Не удалось получить';
 	@override String get media_env_background => 'Загрузка продолжается в фоне: Настройки → Видео в заметку.';
 	@override String get media_env_uninstall => 'Удалить';
 	@override String get media_env_finishing => 'Скачано · Установка…';

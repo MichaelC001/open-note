@@ -2,6 +2,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import 'transcript_parser.dart';
 
 class WhisperException implements Exception {
@@ -20,6 +22,7 @@ class WhisperRunner {
     required String wavPath,
     required String outPrefix,
     String language = 'auto',
+    bool noGpu = false,
   }) {
     final args = [
       '-m', modelPath,
@@ -32,8 +35,16 @@ class WhisperRunner {
     if (language != 'auto') {
       args.addAll(['-l', language]);
     }
+    if (noGpu) {
+      args.add('-ng');
+    }
     return args;
   }
+
+  /// 识别 Metal 后端崩溃特征（mac 实测：退出码 -6，或 stderr 含
+  /// "cannot run the operation"，如 pre-allocated tensor 在 MTL buffer 分配失败）。
+  static bool looksLikeGpuFailure(int exitCode, String stderr) =>
+      exitCode == -6 || stderr.contains('cannot run the operation');
 
   /// 从输出解析已转录到的秒数（行如 "[00:01:23 --> 00:01:30]"）。
   static int? parseProgressSeconds(String chunk) {
@@ -69,32 +80,53 @@ class WhisperRunner {
     final prefix = wav.path.toLowerCase().endsWith('.wav')
         ? wav.path.substring(0, wav.path.length - 4)
         : '${wav.path}_out';
-    final process = await Process.start(
-      whisperCliPath,
-      buildArgs(
-          modelPath: model.path,
-          wavPath: wav.path,
-          outPrefix: prefix,
-          language: language),
-    );
-    onStarted?.call(process);
-    // 段落文本行走 stdout，不排水会填满 64KB 管道导致 whisper 写阻塞死锁
-    process.stdout.listen((_) {}, onError: (_) {});
-    final sbErr = StringBuffer();
-    process.stderr.transform(utf8.decoder).listen((chunk) {
-      sbErr.write(chunk);
-      if (totalDurationMs == null || totalDurationMs <= 0) return;
-      final sec = parseProgressSeconds(chunk);
-      final pct = parseProgressPercent(chunk);
-      if (pct != null) {
-        onProgress?.call(pct.clamp(0.0, 1.0));
-      } else if (sec != null) {
-        onProgress?.call((sec * 1000 / totalDurationMs).clamp(0.0, 1.0));
-      }
-    });
-    final code = await process.exitCode;
+
+    Future<(int, StringBuffer)> runOnce({required bool noGpu}) async {
+      final process = await Process.start(
+        whisperCliPath,
+        buildArgs(
+            modelPath: model.path,
+            wavPath: wav.path,
+            outPrefix: prefix,
+            language: language,
+            noGpu: noGpu),
+      );
+      onStarted?.call(process);
+      // 段落文本行走 stdout，不排水会填满 64KB 管道导致 whisper 写阻塞死锁
+      process.stdout.listen((_) {}, onError: (_) {});
+      final sbErr = StringBuffer();
+      process.stderr.transform(utf8.decoder).listen((chunk) {
+        sbErr.write(chunk);
+        if (totalDurationMs == null || totalDurationMs <= 0) return;
+        final sec = parseProgressSeconds(chunk);
+        final pct = parseProgressPercent(chunk);
+        if (pct != null) {
+          onProgress?.call(pct.clamp(0.0, 1.0));
+        } else if (sec != null) {
+          onProgress?.call((sec * 1000 / totalDurationMs).clamp(0.0, 1.0));
+        }
+      });
+      final code = await process.exitCode;
+      return (code, sbErr);
+    }
+
+    var (code, sbErr) = await runOnce(noGpu: false);
     if (code != 0) {
-      throw WhisperException('whisper.cpp 退出码 $code', _tail(sbErr));
+      if (looksLikeGpuFailure(code, sbErr.toString())) {
+        // Metal 后端 op 分配失败：禁 GPU（CPU 模式）重试一次
+        final (retryCode, retryErr) = await runOnce(noGpu: true);
+        if (retryCode == 0) {
+          debugPrint('whisper: Metal 失败已自动降级 CPU 重试成功');
+          sbErr = retryErr;
+        } else {
+          throw WhisperException(
+            'whisper.cpp 退出码 $retryCode（已自动尝试禁用 GPU（CPU 模式）仍失败）',
+            _tail(retryErr),
+          );
+        }
+      } else {
+        throw WhisperException('whisper.cpp 退出码 $code', _tail(sbErr));
+      }
     }
     final jsonFile = File('$prefix.json');
     if (!await jsonFile.exists()) {
