@@ -745,12 +745,41 @@ class MediaImportProvider extends ChangeNotifier {
   }
 
   Future<String> _resolveWhisperAssetUrl() async {
-    final dio = Dio();
-    final resp = await dio.get<dynamic>(
+    final candidates = MediaDownloader.whisperApiCandidates(
       MediaDownloader.whisperReleasesApiUrl(),
-      options: Options(headers: {'Accept': 'application/vnd.github+json'}),
+      mode: await settings.downloadSource(),
     );
-    final releases = (resp.data as List?) ?? const [];
+    final dio = Dio(BaseOptions(
+      connectTimeout: const Duration(seconds: 15),
+      sendTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 15),
+    ));
+    Object? lastError;
+    for (final url in candidates) {
+      final List<dynamic> releases;
+      try {
+        final resp = await dio.get<dynamic>(
+          url,
+          options: Options(headers: {'Accept': 'application/vnd.github+json'}),
+        );
+        if (resp.statusCode != 200) {
+          lastError = Exception('HTTP ${resp.statusCode}');
+          continue;
+        }
+        releases = (resp.data as List?) ?? const [];
+      } catch (e) {
+        lastError = e;
+        continue;
+      }
+      final downloadUrl = _pickWhisperDownloadUrl(releases);
+      if (downloadUrl != null) return downloadUrl;
+      throw Exception('当前平台暂无 whisper.cpp 预编译包，请查看安装指引手动安装');
+    }
+    throw Exception(
+        '无法获取 whisper.cpp 版本列表（已尝试 GitHub 直连与 gh-proxy 镜像）：$lastError');
+  }
+
+  static String? _pickWhisperDownloadUrl(List<dynamic> releases) {
     for (final release in releases) {
       final map = release as Map;
       final assets = ((map['assets'] as List?) ?? const [])
@@ -767,7 +796,7 @@ class MediaImportProvider extends ChangeNotifier {
             '${map['tag_name']}/$asset';
       }
     }
-    throw Exception('当前平台暂无 whisper.cpp 预编译包，请查看安装指引手动安装');
+    return null;
   }
 
   /// Dart 进程真实架构（Rosetta 下 x64 进程选 x64 包恰好正确）。

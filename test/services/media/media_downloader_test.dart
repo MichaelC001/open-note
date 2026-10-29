@@ -1,7 +1,9 @@
 // test/services/media/media_downloader_test.dart
 import 'dart:ffi' as ffi;
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:archive/archive.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_note/services/media/media_downloader.dart';
 
@@ -242,4 +244,100 @@ void main() {
       await MediaDownloader().extract(f, '${tmp.path}/out2');
     });
   });
+
+  group('whisperApiCandidates', () {
+    const apiUrl =
+        'https://api.github.com/repos/ggml-org/whisper.cpp/releases?per_page=30';
+    test('auto: 直连优先、gh-proxy 镜像兜底', () {
+      expect(
+          MediaDownloader.whisperApiCandidates(
+              apiUrl, mode: MediaDownloadSourceMode.auto),
+          [apiUrl, 'https://gh-proxy.com/$apiUrl']);
+    });
+    test('direct: 直连优先、gh-proxy 镜像兜底', () {
+      expect(
+          MediaDownloader.whisperApiCandidates(
+              apiUrl, mode: MediaDownloadSourceMode.direct),
+          [apiUrl, 'https://gh-proxy.com/$apiUrl']);
+    });
+    test('mirror: gh-proxy 镜像优先（ghfast 不支持 api.github.com）', () {
+      expect(
+          MediaDownloader.whisperApiCandidates(
+              apiUrl, mode: MediaDownloadSourceMode.mirror),
+          ['https://gh-proxy.com/$apiUrl', apiUrl]);
+    });
+  });
+
+  group('download 失败逐源诊断', () {
+    late Directory tmp;
+    setUp(() => tmp = Directory.systemTemp.createTempSync('vtn_diag'));
+    tearDown(() => tmp.deleteSync(recursive: true));
+    const hf =
+        'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin';
+
+    ResponseBody notFound(RequestOptions options) =>
+        throw DioException.badResponse(
+          statusCode: 404,
+          requestOptions: options,
+          response: Response<dynamic>(
+              requestOptions: options, statusCode: 404, data: 'not found'),
+        );
+
+    test('两候选均失败：消息含两个 url 片段与「已尝试 2 个源」', () async {
+      final dio = Dio()
+        ..httpClientAdapter = _StubAdapter((options) => notFound(options));
+      final dl = MediaDownloader(dio: dio);
+      Object? err;
+      try {
+        await dl.download(hf, destFile: File('${tmp.path}/m.bin'));
+      } catch (e) {
+        err = e;
+      }
+      expect(err, isNotNull);
+      final msg = err.toString();
+      expect(msg, contains('已尝试 2 个源'));
+      expect(msg, contains(hf));
+      expect(msg, contains('https://hf-mirror.com/ggerganov/whisper.cpp'));
+    });
+
+    test('SHA256 失败候选也计入逐源诊断', () async {
+      final dio = Dio()
+        ..httpClientAdapter = _StubAdapter((options) {
+          if (options.uri.host == 'huggingface.co') {
+            return ResponseBody.fromString('hello', 200);
+          }
+          return notFound(options);
+        });
+      final dl = MediaDownloader(dio: dio);
+      Object? err;
+      try {
+        await dl.download(hf,
+            destFile: File('${tmp.path}/m2.bin'), expectedSha256: 'deadbeef');
+      } catch (e) {
+        err = e;
+      }
+      expect(err, isNotNull);
+      final msg = err.toString();
+      expect(msg, contains('已尝试 2 个源'));
+      expect(msg, contains('SHA256'));
+      expect(msg, contains(hf));
+      expect(msg, contains('https://hf-mirror.com/ggerganov/whisper.cpp'));
+    });
+  });
+}
+
+class _StubAdapter implements HttpClientAdapter {
+  final ResponseBody Function(RequestOptions options) handler;
+  _StubAdapter(this.handler);
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async =>
+      handler(options);
+
+  @override
+  void close({bool force = false}) {}
 }

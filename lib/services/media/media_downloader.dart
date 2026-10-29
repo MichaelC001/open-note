@@ -17,8 +17,10 @@ class MediaDownloader {
               receiveTimeout: const Duration(minutes: 30),
             ));
 
+  static const ghProxyPrefix = 'https://gh-proxy.com/';
+
   static const List<String> githubMirrors = [
-    'https://gh-proxy.com/',
+    ghProxyPrefix,
     'https://ghfast.top/',
   ];
 
@@ -112,6 +114,20 @@ class MediaDownloader {
   static String whisperReleasesApiUrl() =>
       'https://api.github.com/repos/ggml-org/whisper.cpp/releases?per_page=30';
 
+  /// whisper.cpp releases API 候选链：gh-proxy 支持代理 api.github.com，
+  /// ghfast.top 不支持（Invalid input），故仅 gh-proxy 入链。
+  static List<String> whisperApiCandidates(
+      String apiUrl, {required MediaDownloadSourceMode mode}) {
+    final mirrored = '$ghProxyPrefix$apiUrl';
+    switch (mode) {
+      case MediaDownloadSourceMode.mirror:
+        return [mirrored, apiUrl];
+      case MediaDownloadSourceMode.direct:
+      case MediaDownloadSourceMode.auto:
+        return [apiUrl, mirrored];
+    }
+  }
+
   static String? pickWhisperAsset(List<String> names,
       {required bool isWindows, required bool isMac, required bool isArm}) {
     final candidates = MediaToolCandidates.whisper(names,
@@ -129,7 +145,7 @@ class MediaDownloader {
   }) async {
     await destFile.parent.create(recursive: true);
     final partial = File('${destFile.path}.part');
-    Object? lastError;
+    final attempts = <String>[];
     for (final url in candidateUrls(directUrl, mode)) {
       try {
         await _dio.download(
@@ -141,7 +157,7 @@ class MediaDownloader {
         if (expectedSha256 != null) {
           final actual = await sha256File(partial);
           if (actual != expectedSha256) {
-            lastError = Exception('SHA256 校验失败: $url');
+            attempts.add('$url → SHA256 校验失败');
             if (await partial.exists()) await partial.delete();
             continue;
           }
@@ -151,12 +167,20 @@ class MediaDownloader {
         return destFile;
       } on DioException catch (e) {
         if (e.type == DioExceptionType.cancel) rethrow;
-        lastError = e;
+        attempts.add('$url → ${_briefError(e)}');
       } catch (e) {
-        lastError = e;
+        attempts.add('$url → ${_briefError(e)}');
       }
     }
-    throw Exception('下载失败: $lastError');
+    throw Exception(
+        '下载失败（已尝试 ${attempts.length} 个源）：${attempts.join('；')}');
+  }
+
+  /// 逐源诊断用的错误摘要：toString 首行并截断，避免堆栈刷屏。
+  static String _briefError(Object e) {
+    var s = e.toString().split('\n').first.trim();
+    if (s.length > 120) s = s.substring(0, 120);
+    return s;
   }
 
   /// 解压 zip / tar.gz 到 destDir；非压缩包（如 yt-dlp 单文件）直接成功。
