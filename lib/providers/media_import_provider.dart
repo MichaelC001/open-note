@@ -515,11 +515,14 @@ class MediaImportProvider extends ChangeNotifier {
     if (plan == null) {
       // Windows：winget 缺失时自动降级便携版下载（whisperCli 链路完整：
       // zip 下载+解压+dll 平铺）。下载期间 UI 进度条自解释；downloadTool
-      // 开头会清 toolHints，故提示必须在其完成后设置；失败时
-      // errorMessage/errorDetail 已展示，无需重复。
+      // 开头会清 toolHints，故提示必须在其完成后设置。提示仅在安装就绪
+      // 后展示——静默 return 或下载失败时不显示误导性提示，失败信息
+      // 由 errorMessage/errorDetail 覆盖。
       if (Platform.isWindows) {
         await downloadTool(kind);
-        toolHints[kind] = '未检测到 winget（应用安装程序），已自动改用便携版下载';
+        if (toolStatuses[kind]?.ready ?? false) {
+          toolHints[kind] = '未检测到 winget（应用安装程序），已自动改用便携版下载';
+        }
         return;
       }
       errorMessage = '无法自动安装';
