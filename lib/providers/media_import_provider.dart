@@ -517,7 +517,8 @@ class MediaImportProvider extends ChangeNotifier {
       errorDetail = Platform.isMacOS
           ? '未检测到 Homebrew，请按指引手动安装（终端执行 brew install whisper-cpp）'
           : Platform.isWindows
-              ? '未检测到 winget（应用安装程序），请按指引手动安装'
+              ? '未检测到 winget（应用安装程序），请按指引手动安装；'
+                  '可从 Microsoft Store 安装“应用安装程序 (App Installer)”后重试'
               : '当前平台不支持自动安装，请按指引手动安装';
       _notify();
       return;
@@ -607,7 +608,8 @@ class MediaImportProvider extends ChangeNotifier {
         if (plan == null) {
           errorMessage = '无法自动卸载';
           errorDetail = Platform.isWindows
-              ? '未检测到 winget（应用安装程序），请使用对应包管理器卸载'
+              ? '未检测到 winget（应用安装程序），请使用对应包管理器卸载；'
+                  '可从 Microsoft Store 安装“应用安装程序 (App Installer)”后重试'
               : '请使用对应包管理器卸载';
           return;
         }
