@@ -162,6 +162,30 @@ void main() {
           reason: '全量安装：非库文件同样平铺复制');
     });
 
+    test('exe 搜索按候选优先级：whisper-cli 优先于 main（修复 main.exe 覆盖）', () async {
+      // 复刻实证包结构并复现 Windows 枚举序：bin/main（旧入口，27B）先于
+      // Release/whisper-cli（真主程序，479B）被枚举（本机 APFS 实证该布局
+      // 稳定 main 在前），旧实现按枚举序误选 main 并覆盖真 exe
+      final binDir = Directory('${tmp.path}/extract4/bin')..createSync(recursive: true);
+      final relDir = Directory('${tmp.path}/extract4/Release')..createSync(recursive: true);
+      final exeName = Platform.isWindows ? 'whisper-cli.exe' : 'whisper-cli';
+      final mainName = Platform.isWindows ? 'main.exe' : 'main';
+      File('${binDir.path}/$mainName').writeAsStringSync('M' * 27);
+      File('${relDir.path}/$exeName').writeAsStringSync('C' * 479);
+      final svc = MediaToolService(resolveBaseDir: () async => tmp.path);
+      final installed = await svc.installExtractedBinary(
+          '${tmp.path}/extract4', MediaToolKind.whisperCli);
+      expect(installed, isNotNull);
+      final toolDirPath = await svc.toolDir(MediaToolKind.whisperCli);
+      final dest = File('$toolDirPath/$exeName');
+      expect(dest.lengthSync(), 479,
+          reason: '主程序必须取 whisper-cli 字节，而非枚举序靠前的 main');
+      expect(dest.readAsStringSync(), 'C' * 479);
+      // 全量平铺规格：main 非 foundName，仍会复制进 toolDir（无害副产物，
+      // 应用仅执行 binaryName 即 whisper-cli）
+      expect(File('$toolDirPath/$mainName').existsSync(), isTrue);
+    });
+
     test('whisper 全量安装：嵌套 Release/ 子目录 exe+dll+杂文件全部平铺且 exe 改名', () async {
       final release = Directory('${tmp.path}/extract3/whisper-bin-x64/Release');
       release.createSync(recursive: true);

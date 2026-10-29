@@ -303,13 +303,19 @@ class MediaToolService {
       MediaToolKind.whisperCli =>
         ['whisper-cli', 'whisper-cli.exe', 'main', 'main.exe'],
     };
+    // 按 candidates 列表优先级搜索（外层候选、内层递归枚举），而非枚举序：
+    // whisper-bin-x64.zip 同时含 main.exe（旧入口）与 whisper-cli.exe，
+    // 按枚举序会误选先被枚举的 main 并在末尾 rename 覆盖真 whisper-cli
     File? found;
-    await for (final e in Directory(extractedDir)
-        .list(recursive: true, followLinks: false)) {
-      if (e is File && candidates.contains(e.uri.pathSegments.last)) {
-        found = e;
-        break;
+    for (final name in candidates) {
+      await for (final e in Directory(extractedDir)
+          .list(recursive: true, followLinks: false)) {
+        if (e is File && e.uri.pathSegments.last == name) {
+          found = e;
+          break;
+        }
       }
+      if (found != null) break;
     }
     if (found == null) return null;
     final dirPath = await toolDir(kind);
