@@ -76,6 +76,8 @@ class WhisperRunner {
     int? totalDurationMs,
     void Function(double progress)? onProgress,
     void Function(Process process)? onStarted,
+    bool forceNoGpu = false,
+    void Function()? onGpuFallback,
   }) async {
     final prefix = wav.path.toLowerCase().endsWith('.wav')
         ? wav.path.substring(0, wav.path.length - 4)
@@ -110,13 +112,15 @@ class WhisperRunner {
       return (code, sbErr);
     }
 
-    var (code, sbErr) = await runOnce(noGpu: false);
+    // forceNoGpu（运行层决策：开关关/黑名单命中）时首启即禁 GPU，不再先崩 Metal
+    var (code, sbErr) = await runOnce(noGpu: forceNoGpu);
     if (code != 0) {
       if (looksLikeGpuFailure(code, sbErr.toString())) {
         // Metal 后端 op 分配失败：禁 GPU（CPU 模式）重试一次
         final (retryCode, retryErr) = await runOnce(noGpu: true);
         if (retryCode == 0) {
           debugPrint('whisper: Metal 失败已自动降级 CPU 重试成功');
+          onGpuFallback?.call();
           sbErr = retryErr;
         } else {
           throw WhisperException(

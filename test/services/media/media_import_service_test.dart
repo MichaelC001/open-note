@@ -37,11 +37,37 @@ class _FakeWhisperRunner extends WhisperRunner {
     int? totalDurationMs,
     void Function(double progress)? onProgress,
     void Function(Process process)? onStarted,
+    bool forceNoGpu = false,
+    void Function()? onGpuFallback,
   }) async =>
       const Transcript(segments: [
         TranscriptSegment(startMs: 0, endMs: 1000, text: '你好'),
         TranscriptSegment(startMs: 1000, endMs: 2000, text: '世界'),
       ]);
+}
+
+/// 记录转录入参（forceNoGpu / onGpuFallback 透传验证）。
+class _CapturingRunner extends WhisperRunner {
+  final List<bool> forceNoGpuCalls = [];
+  final List<void Function()?> fallbackCallbacks = [];
+  @override
+  Future<Transcript> transcribe({
+    required String whisperCliPath,
+    required File model,
+    required File wav,
+    String language = 'auto',
+    int? totalDurationMs,
+    void Function(double progress)? onProgress,
+    void Function(Process process)? onStarted,
+    bool forceNoGpu = false,
+    void Function()? onGpuFallback,
+  }) async {
+    forceNoGpuCalls.add(forceNoGpu);
+    fallbackCallbacks.add(onGpuFallback);
+    return const Transcript(segments: [
+      TranscriptSegment(startMs: 0, endMs: 1000, text: 'hi'),
+    ]);
+  }
 }
 
 class _FakeFormatter extends TranscriptFormatter {
@@ -206,5 +232,69 @@ void main() {
             includeTimestamps: true,
             polishLevel: ContentPolishLevel.organized),
         throwsA(isA<MediaImportException>()));
+  });
+
+  group('运行层 GPU 决策注入（resolveNoGpu / onGpuFallback 透传）', () {
+    Future<(Directory, File)> makeWav() async {
+      final src = File('${tmp.path}/gpu.wav')
+        ..writeAsBytesSync(List<int>.filled(44 + 32000, 0));
+      return (tmp, src);
+    }
+
+    test('resolveNoGpu true → runner forceNoGpu=true；未注入 → false', () async {
+      var resolveCalls = 0;
+      final runner = _CapturingRunner();
+      final (_, src) = await makeWav();
+      final svc = MediaImportService(
+        resolveBaseDir: () async => tmp.path,
+        toolService: _FakeToolService(() async => tmp.path),
+        modelService: _FakeModelService(() async => tmp.path),
+        whisperRunner: runner,
+        resolveNoGpu: () async {
+          resolveCalls++;
+          return true;
+        },
+      );
+      await svc.run(
+        MediaImportRequest(localFile: src, tier: WhisperModelTier.base),
+        includeTimestamps: false,
+        polishLevel: ContentPolishLevel.raw,
+      );
+      expect(resolveCalls, 1, reason: '转录入口恰调用一次决策');
+      expect(runner.forceNoGpuCalls, [true]);
+
+      final runner2 = _CapturingRunner();
+      final svc2 = MediaImportService(
+        resolveBaseDir: () async => tmp.path,
+        toolService: _FakeToolService(() async => tmp.path),
+        modelService: _FakeModelService(() async => tmp.path),
+        whisperRunner: runner2,
+      );
+      await svc2.run(
+        MediaImportRequest(localFile: src, tier: WhisperModelTier.base),
+        includeTimestamps: false,
+        polishLevel: ContentPolishLevel.raw,
+      );
+      expect(runner2.forceNoGpuCalls, [false]);
+    });
+
+    test('onGpuFallback 原样透传给 runner', () async {
+      final runner = _CapturingRunner();
+      void cb() {}
+      final (_, src) = await makeWav();
+      final svc = MediaImportService(
+        resolveBaseDir: () async => tmp.path,
+        toolService: _FakeToolService(() async => tmp.path),
+        modelService: _FakeModelService(() async => tmp.path),
+        whisperRunner: runner,
+        onGpuFallback: cb,
+      );
+      await svc.run(
+        MediaImportRequest(localFile: src, tier: WhisperModelTier.base),
+        includeTimestamps: false,
+        polishLevel: ContentPolishLevel.raw,
+      );
+      expect(runner.fallbackCallbacks.single, same(cb));
+    });
   });
 }

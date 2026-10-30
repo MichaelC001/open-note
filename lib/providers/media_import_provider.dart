@@ -17,6 +17,7 @@ import '../services/media/tool_update_service.dart';
 import '../services/media/process_runner.dart';
 import '../services/media/transcript_formatter.dart';
 import '../services/media/whisper_model_service.dart';
+import '../services/media/whisper_runner.dart';
 
 enum MediaImportStep { source, envCheck, confirm, processing, done }
 
@@ -571,12 +572,18 @@ class MediaImportProvider extends ChangeNotifier {
       _notify();
       return;
     }
-    if (!reinstallNeeded(stored, expectedWhisperBuild(useGpu: v))) {
+    // 期望构建仅 Windows 流随开关切换（cuda/cpu）；Mac 无包选择（brew/便携
+    // 同款构建，Metal 内置），开关只在运行层生效，恒按 cpu 比对不触发重装
+    final expected = _isWinFlow ? expectedWhisperBuild(useGpu: v) : 'cpu';
+    if (!reinstallNeeded(stored, expected)) {
       return;
     }
     await downloadTool(MediaToolKind.whisperCli);
-    // 提示在下载完成后设置：downloadTool 开头会清 toolHints
-    if (toolStatuses[MediaToolKind.whisperCli]?.ready ?? false) {
+    // 提示在下载完成后设置：downloadTool 开头会清 toolHints。
+    // 仅当本次实际落位构建与期望一致时提示「正在切换」；下载内部触发
+    // CUDA 校验失败自动回退（落位 cpu≠期望 cuda）时保留回退文案不被覆写
+    if (expected == (await settings.whisperBuild()) &&
+        (toolStatuses[MediaToolKind.whisperCli]?.ready ?? false)) {
       toolHints[MediaToolKind.whisperCli] =
           v ? '正在切换 CUDA 版本' : '正在切换 CPU 版本';
       _notify();
@@ -590,6 +597,61 @@ class MediaImportProvider extends ChangeNotifier {
   /// 已装构建与期望不一致时需重装；无构建记录（unknown）不自动重装。
   static bool reinstallNeeded(String? stored, String expected) =>
       stored != null && stored != expected;
+
+  /// whisper 运行层 GPU 决策纯函数：开关 ∧ Metal 能力 ∧ 版本黑名单未命中
+  /// → 允许 GPU（返回 false 不加 -ng）。
+  /// - 版本未知（null/'ready' 旧探测缓存）→ 键无法构造 → 不禁 GPU
+  ///   （Metal 崩溃后仍有 -ng 重试兜底）。
+  /// - Windows（cuda）运行层不禁 GPU：构建已由安装层选定，CUDA 构建缺省
+  ///   启用加速；Metal 崩溃重试特征仅匹配 Metal，对 Windows 无副作用。
+  /// - 无能力（none）→ 禁 GPU。
+  static bool whisperNoGpuDecision({
+    required bool gpuEnabled,
+    required GpuKind kind,
+    String? installedVersion,
+    Set<String> unavailableKeys = const {},
+  }) {
+    if (!gpuEnabled) return true;
+    switch (kind) {
+      case GpuKind.metal:
+        final v = installedVersion;
+        if (v == null || v.isEmpty || v == 'ready') return false;
+        return unavailableKeys.contains(gpuUnavailableKeyMac(v));
+      case GpuKind.cuda:
+        return false;
+      case GpuKind.none:
+        return true;
+    }
+  }
+
+  /// whisper 运行层 GPU 决策（Mac Metal 语义）：开关 ∧ 能力==metal ∧
+  /// 黑名单未命中 mac:版本 → 允许 GPU。版本取 toolStatuses 已探明的真实
+  /// 版本号；未知（'ready'/null 旧缓存）视为键 miss → 不禁 GPU（Metal
+  /// 崩溃兜底仍在）。Windows 语义见 [whisperNoGpuDecision]。
+  Future<bool> resolveWhisperNoGpu() async {
+    final kind = (await _gpuDetector.detect()).kind;
+    return whisperNoGpuDecision(
+      gpuEnabled: await settings.whisperGpu(),
+      kind: kind,
+      installedVersion: toolStatuses[MediaToolKind.whisperCli]?.version,
+      unavailableKeys: (await settings.gpuUnavailableVersions()).keys.toSet(),
+    );
+  }
+
+  /// Mac Metal 崩溃 → CPU 重试成功后的黑名单写入（版本升级后键自然不命中）。
+  /// 版本未知（'ready'/null）无法构造键：跳过记录，下次仍走 Metal 崩溃兜底。
+  Future<void> _markWhisperMetalUnavailable() async {
+    final version = toolStatuses[MediaToolKind.whisperCli]?.version;
+    if (version == null || version == 'ready') return;
+    try {
+      await settings.markGpuUnavailable(
+        gpuUnavailableKeyMac(version),
+        'Metal 后端转录崩溃，已自动降级 CPU',
+      );
+    } catch (_) {
+      // 黑名单写入失败不影响转录结果：下次会话重试路径依旧
+    }
+  }
 
   /// 1a 装前可执行验证：mac/linux `chmod +x` 后执行 `-version`（超时 5s），
   /// windows 复制到同目录临时 `.exe` 再探测（PE 必须以 .exe 结尾才能启动）。
@@ -1036,6 +1098,8 @@ class MediaImportProvider extends ChangeNotifier {
       toolService: toolService,
       modelService: modelService,
       formatter: formatter,
+      resolveNoGpu: resolveWhisperNoGpu,
+      onGpuFallback: () => unawaited(_markWhisperMetalUnavailable()),
     );
     _activeService = service;
 
@@ -1073,7 +1137,14 @@ class MediaImportProvider extends ChangeNotifier {
         }
       } catch (e) {
         errorMessage = '转换失败';
-        errorDetail = e.toString();
+        var detail = e.toString();
+        // Windows CUDA 构建运行期转录崩溃：追加引导式兜底指引
+        //（不自动重装——1.2GB 重下载过重，明确取舍见设计 §三）
+        if (e is WhisperException &&
+            (await settings.whisperBuild()) == 'cuda') {
+          detail += '\n可在设置关闭 GPU 加速后重新下载引擎（CPU 版）';
+        }
+        errorDetail = detail;
       } finally {
         _activeService = null;
         _notify();

@@ -22,6 +22,14 @@ void main() {
       expect(MediaToolService.parseYtDlpVersion('2025.10.22'), isNotNull);
       expect(MediaToolService.parseYtDlpVersion('garbage'), isNull);
     });
+    test('parseWhisperVersion：提取真实版本号，解析失败为 null', () {
+      expect(
+        MediaToolService.parseWhisperVersion(
+            'whisper.cpp version: 1.9.5 (built: Nov  1 2025)'),
+        '1.9.5',
+      );
+      expect(MediaToolService.parseWhisperVersion('garbage'), isNull);
+    });
   });
 
   group('check（注入假命令执行）', () {
@@ -90,9 +98,9 @@ void main() {
       final svc = MediaToolService(
         resolveBaseDir: () async => tmp.path,
         run: (exe, args, {workingDirectory}) async {
-          if (args.contains('--help')) {
+          if (args.contains('--version')) {
             capturedWd = workingDirectory;
-            return ok('usage: whisper-cli [options] file');
+            return ok('whisper.cpp version: 1.9.5 (built: Oct 30 2026)');
           }
           return fail;
         },
@@ -100,6 +108,7 @@ void main() {
       final st = await svc.check(MediaToolKind.whisperCli);
       expect(st.ready, isTrue);
       expect(capturedWd, whisperDir.path);
+      expect(st.version, '1.9.5', reason: '探测 --version 应存真实版本号');
     });
   });
 

@@ -63,6 +63,13 @@ class MediaImportService {
   final TranscriptFormatter? formatter;
   final Future<String> Function() resolveBaseDir;
 
+  /// 运行层 GPU 决策注入点（provider 注入：开关∧能力∧黑名单）；
+  /// null 时不禁 GPU（首启无 -ng，Metal 失败仍有 -ng 重试兜底）。
+  final Future<bool> Function()? resolveNoGpu;
+
+  /// Metal 崩溃→CPU 重试成功回调（provider 用于写 mac:版本 黑名单）。
+  final void Function()? onGpuFallback;
+
   final List<Process> _active = [];
   bool _cancelled = false;
 
@@ -72,6 +79,8 @@ class MediaImportService {
     WhisperRunner? whisperRunner,
     this.formatter,
     Future<String> Function()? resolveBaseDir,
+    this.resolveNoGpu,
+    this.onGpuFallback,
   }) : toolService = toolService ?? MediaToolService(),
        modelService = modelService ?? WhisperModelService(),
        whisperRunner = whisperRunner ?? WhisperRunner(),
@@ -159,12 +168,17 @@ class MediaImportService {
         throw const MediaImportException('whisper.cpp 未就绪，请先完成环境检查');
       }
       final totalMs = estimateWavDurationMs(await wav.length());
+      // 运行层 GPU 决策（Mac Metal：开关∧能力∧版本黑名单），
+      // 命中禁用时首启即带 -ng，不再先崩 Metal 再重试
+      final noGpu = (await resolveNoGpu?.call()) ?? false;
       final transcript = await whisperRunner.transcribe(
         whisperCliPath: cli.path!,
         model: model,
         wav: wav,
         language: req.language,
         totalDurationMs: totalMs,
+        forceNoGpu: noGpu,
+        onGpuFallback: onGpuFallback,
         onProgress: (p) {
           _ensureAlive();
           onProgress?.call(MediaImportPhase.transcribing, p);

@@ -3,14 +3,17 @@ import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:dio/dio.dart';
 import 'package:fake_async/fake_async.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_note/providers/media_import_provider.dart';
+import 'package:open_note/services/media/gpu_capability.dart';
 import 'package:open_note/services/media/media_downloader.dart';
 import 'package:open_note/services/media/media_import_service.dart';
 import 'package:open_note/services/media/media_import_settings.dart';
 import 'package:open_note/services/media/media_tool_service.dart';
 import 'package:open_note/services/media/tool_update_service.dart';
 import 'package:open_note/services/media/whisper_model_service.dart';
+import 'package:open_note/services/media/whisper_runner.dart';
 import 'package:open_note/services/media/process_runner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -71,6 +74,60 @@ class _RealAllModelsService extends WhisperModelService {
   @override
   Future<WhisperModelTier> recommendTierForDevice() async => WhisperModelTier.base;
   // localModelFile 用真实实现（基于 modelsDir 文件存在性）
+}
+
+/// whisperCli 指向假 cli 脚本（真实 WhisperRunner 进程执行），
+/// 其余工具指向不存在路径（.wav 输入经 ProcessException 透传）。
+class _WhisperScriptToolService extends MediaToolService {
+  final String whisperPath;
+  _WhisperScriptToolService(this.whisperPath, Future<String> Function() base)
+      : super(resolveBaseDir: base);
+  @override
+  Future<MediaToolStatus> check(MediaToolKind kind,
+      {bool forceVerify = false}) async {
+    if (kind == MediaToolKind.whisperCli) {
+      return MediaToolStatus(
+        kind: kind,
+        ready: true,
+        path: whisperPath,
+        version: '1.9.5',
+        source: MediaToolSource.appManaged,
+      );
+    }
+    return MediaToolStatus(
+      kind: kind,
+      ready: true,
+      path: '/nonexistent/${kind.name}',
+      version: '1',
+      source: MediaToolSource.appManaged,
+    );
+  }
+}
+
+/// 生成假 whisper-cli 脚本：无 `-ng` 时输出 Metal 崩溃特征并退出 1；
+/// 带 `-ng` 时写转录 json 并退出 0（每次调用向 [logPath] 追加 ng=0/1）。
+Future<File> _writeFakeWhisperCli(Directory dir, String logPath) async {
+  final script = File('${dir.path}/whisper-cli-fake.sh');
+  await script.writeAsString('''
+#!/bin/sh
+prefix=""
+has_ng=0
+prev=""
+for a in "\$@"; do
+  [ "\$prev" = "-of" ] && prefix="\$a"
+  [ "\$a" = "-ng" ] && has_ng=1
+  prev="\$a"
+done
+echo "ng=\$has_ng" >> '$logPath'
+if [ "\$has_ng" = "1" ]; then
+  echo '{"transcription":[{"offsets":{"from":0,"to":1000},"text":" hi"}],"result":{"language":"en"}}' > "\$prefix.json"
+  exit 0
+fi
+echo "ggml_metal_init: error: cannot run the operation" >&2
+exit 1
+''');
+  await Process.run('chmod', ['+x', script.path]);
+  return script;
 }
 
 void main() {
@@ -984,6 +1041,76 @@ void main() {
     });
   });
 
+  group('whisperNoGpuDecision 运行层纯函数（开关∧能力∧黑名单）', () {
+    bool decision({
+      required bool gpuEnabled,
+      required GpuKind kind,
+      String? installedVersion,
+      Set<String> unavailableKeys = const {},
+    }) =>
+        MediaImportProvider.whisperNoGpuDecision(
+          gpuEnabled: gpuEnabled,
+          kind: kind,
+          installedVersion: installedVersion,
+          unavailableKeys: unavailableKeys,
+        );
+
+    test('开关关闭 → 禁 GPU（-ng）', () {
+      expect(
+          decision(gpuEnabled: false, kind: GpuKind.metal, installedVersion: '1.9.5'),
+          isTrue);
+    });
+
+    test('Metal + 版本已知 + 黑名单未命中 → 允许 GPU', () {
+      expect(
+          decision(gpuEnabled: true, kind: GpuKind.metal, installedVersion: '1.9.5'),
+          isFalse);
+    });
+
+    test('Metal + 黑名单命中 mac:版本 → 禁 GPU（同版本直接 CPU 启动）', () {
+      expect(
+          decision(
+              gpuEnabled: true,
+              kind: GpuKind.metal,
+              installedVersion: '1.9.5',
+              unavailableKeys: const {'mac:1.9.5'}),
+          isTrue);
+      // 其他版本不受影响（升级后键自然不命中）
+      expect(
+          decision(
+              gpuEnabled: true,
+              kind: GpuKind.metal,
+              installedVersion: '1.9.6',
+              unavailableKeys: const {'mac:1.9.5'}),
+          isFalse);
+    });
+
+    test('Metal + 版本未知（null/ready 旧缓存）→ 允许 GPU（Metal 崩溃兜底仍在）',
+        () {
+      expect(
+          decision(gpuEnabled: true, kind: GpuKind.metal, installedVersion: null),
+          isFalse);
+      expect(
+          decision(
+              gpuEnabled: true,
+              kind: GpuKind.metal,
+              installedVersion: 'ready'),
+          isFalse);
+    });
+
+    test('CUDA 能力（Windows）→ 运行层不禁 GPU（构建已由安装层选定）', () {
+      expect(
+          decision(gpuEnabled: true, kind: GpuKind.cuda, installedVersion: '1.9.5'),
+          isFalse);
+    });
+
+    test('无 GPU 能力 → 禁 GPU', () {
+      expect(
+          decision(gpuEnabled: true, kind: GpuKind.none, installedVersion: '1.9.5'),
+          isTrue);
+    });
+  });
+
   group('pickWhisperDownloadUrl（GPU 选包与黑名单）', () {
     const releases = [
       {
@@ -1036,18 +1163,26 @@ void main() {
   });
 
   group('setWhisperGpuEnabled 切换联动', () {
-    _SpyDownloadProvider makeSpy({Map<String, Object> prefs = const {}}) {
+    _SpyDownloadProvider makeSpy({
+      Map<String, Object> prefs = const {},
+      bool? isWindowsOverride,
+    }) {
       if (prefs.isNotEmpty) {
         SharedPreferences.setMockInitialValues(prefs);
       }
       return _SpyDownloadProvider(
         toolService: _ReadyToolService(() async => tmp.path),
         modelService: _AllModelsService(() async => tmp.path),
+        isWindowsOverride: isWindowsOverride,
       );
     }
 
-    test('appManaged 且已装 cuda：关 GPU 触发重装并提示正在切换', () async {
-      final p = makeSpy(prefs: {'media_tool_whisper_build': 'cuda'});
+    test('appManaged 且已装 cuda：关 GPU 触发重装并提示正在切换（Windows 流）',
+        () async {
+      final p = makeSpy(
+        prefs: {'media_tool_whisper_build': 'cuda'},
+        isWindowsOverride: true,
+      )..installedBuildOnDownload = 'cpu';
       await p.startForFile(File('${tmp.path}/a.mp4'));
 
       await p.setWhisperGpuEnabled(false);
@@ -1067,14 +1202,71 @@ void main() {
       expect(p.toolHints[MediaToolKind.whisperCli], isNull);
     });
 
-    test('appManaged 且已装 cpu：开 GPU 触发重装', () async {
-      final p = makeSpy(prefs: {'media_tool_whisper_build': 'cpu'});
+    test('appManaged 且已装 cpu：开 GPU 触发重装（Windows 流）', () async {
+      final p = makeSpy(
+        prefs: {'media_tool_whisper_build': 'cpu'},
+        isWindowsOverride: true,
+      )..installedBuildOnDownload = 'cuda';
       await p.startForFile(File('${tmp.path}/a.mp4'));
 
       await p.setWhisperGpuEnabled(true);
 
       expect(p.downloadCalls, 1, reason: 'cpu→cuda 构建不匹配应重装');
       expect(p.toolHints[MediaToolKind.whisperCli], contains('正在切换'));
+    });
+
+    test('mac 流（非 Windows）：开 GPU 不触发重装（Metal 内置，仅运行层生效）',
+        () async {
+      final p = makeSpy(
+        prefs: {'media_tool_whisper_build': 'cpu'},
+        isWindowsOverride: false,
+      );
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+
+      await p.setWhisperGpuEnabled(true);
+
+      expect(p.downloadCalls, 0, reason: 'Mac 无包选择：开 GPU 不应重装');
+      expect(p.toolHints[MediaToolKind.whisperCli], isNull);
+      expect(await MediaImportSettings().whisperGpu(), isTrue);
+    });
+
+    test('切换触发下载且下载内部已回退 CPU：保留回退文案不覆写「正在切换」',
+        () async {
+      // 真 downloadTool：CUDA 资产装后校验失败 → 内部自动回退 CPU（含回退提示）
+      final tools = _FlakyVerifyToolService(() async => tmp.path, 1);
+      final fake = _ZipWritingDownloader('whisper-cli');
+      var resolverCalls = 0;
+      SharedPreferences.setMockInitialValues(
+          <String, Object>{'media_tool_whisper_build': 'cpu'});
+      final p = MediaImportProvider(
+        toolService: tools,
+        modelService: _AllModelsService(() async => tmp.path),
+        downloader: fake,
+        whisperAssetResolver: () async {
+          resolverCalls++;
+          return resolverCalls == 1
+              ? (
+                  url: 'https://github.com/ggml-org/whisper.cpp/releases/'
+                      'download/b5454/whisper-bin-win-cuda-12.4.0-x64.zip',
+                  build: 'cuda',
+                )
+              : (
+                  url: 'https://github.com/ggml-org/whisper.cpp/releases/'
+                      'download/b5454/whisper-bin-x64.zip',
+                  build: 'cpu',
+                );
+        },
+        isWindowsOverride: true,
+      );
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+
+      await p.setWhisperGpuEnabled(true);
+
+      expect(fake.downloadCalls, 2, reason: 'CUDA 尝试 + CPU 回退各一次');
+      expect(p.toolHints[MediaToolKind.whisperCli], contains('已回退 CPU'));
+      expect(p.toolHints[MediaToolKind.whisperCli],
+          isNot(contains('正在切换')));
+      expect(await MediaImportSettings().whisperBuild(), 'cpu');
     });
 
     test('构建记录 unknown（无记录）→ 不重装且提示重新下载引擎后生效', () async {
@@ -1167,6 +1359,104 @@ void main() {
       expect(await MediaImportSettings().whisperBuild(), 'cuda');
       expect((await MediaImportSettings().gpuUnavailableVersions()), isEmpty);
       expect(p.toolHints[MediaToolKind.whisperCli], isNull);
+    });
+  });
+
+  group('whisper 运行层 GPU 决策与 Metal 黑名单（假 cli 脚本集成）', () {
+    // confirmAndStart 真实执行 service.run：resolveBaseDir 走 path_provider，
+    // 测试环境 mock 到 tmp 目录
+    void mockPathProvider() {
+      const channel = MethodChannel('plugins.flutter.io/path_provider');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async => tmp.path);
+      addTearDown(() =>
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, null));
+    }
+
+    File makeWavSource() => File('${tmp.path}/src.wav')
+      ..writeAsBytesSync(List<int>.filled(44 + 32000, 0));
+
+    Future<(MediaImportProvider, File)> makeScriptProvider() async {
+      mockPathProvider();
+      final whisperDir = Directory('${tmp.path}/tools/whisper')
+        ..createSync(recursive: true);
+      final log = File('${tmp.path}/invocations.log');
+      final cli = await _writeFakeWhisperCli(whisperDir, log.path);
+      final p = MediaImportProvider(
+        toolService: _WhisperScriptToolService(cli.path, () async => tmp.path),
+        modelService: _AllModelsService(() async => tmp.path),
+      );
+      await p.startForFile(makeWavSource());
+      return (p, log);
+    }
+
+    test('Metal 崩溃→CPU 重试成功：写 mac:版本 黑名单（版本升级后自动重试 GPU）',
+        skip: Platform.isWindows ? '依赖 sh 脚本假进程' : null, () async {
+      final (p, log) = await makeScriptProvider();
+
+      await p.confirmAndStart(saveNote: (r) async => 'note-1');
+      // onGpuFallback 黑名单写入为 fire-and-forget，等待落盘
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(p.step, MediaImportStep.done);
+      expect(p.errorMessage, isNull);
+      expect(log.readAsStringSync().trim().split('\n'), ['ng=0', 'ng=1'],
+          reason: '决策不禁 GPU：首启无 -ng 崩溃后重试');
+      expect(
+          (await MediaImportSettings().gpuUnavailableVersions()).keys,
+          contains('mac:1.9.5'),
+          reason: 'toolStatuses 版本 1.9.5 构造黑名单键');
+    });
+
+    test('GPU 开关关闭：决策禁 GPU 首启带 -ng 直达成功，不写黑名单',
+        skip: Platform.isWindows ? '依赖 sh 脚本假进程' : null, () async {
+      SharedPreferences.setMockInitialValues(
+          <String, Object>{'media_whisper_gpu': false});
+      final (p, log) = await makeScriptProvider();
+
+      await p.confirmAndStart(saveNote: (r) async => 'note-1');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(p.step, MediaImportStep.done);
+      expect(p.errorMessage, isNull);
+      expect(log.readAsStringSync().trim().split('\n'), ['ng=1'],
+          reason: '开关关 → 首启即 -ng，不再先无参尝试');
+      expect(await MediaImportSettings().gpuUnavailableVersions(), isEmpty,
+          reason: '首启即 -ng 成功，不应触发回退黑名单');
+    });
+  });
+
+  group('Windows CUDA 构建转录失败指引', () {
+    Future<MediaImportProvider> startWithBuild(String build) async {
+      SharedPreferences.setMockInitialValues(
+          <String, Object>{'media_tool_whisper_build': build});
+      final p = makeProvider();
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+      return p;
+    }
+
+    test('build==cuda：转录失败 errorDetail 追加关闭 GPU 加速指引', () async {
+      final p = await startWithBuild('cuda');
+      await p.confirmAndStart(
+        runOverride: (_, _) async => throw const WhisperException(
+            'whisper.cpp 退出码 3222226', 'CUDA error at ggml-cuda'),
+        saveNote: (r) async => null,
+      );
+      expect(p.errorMessage, '转换失败');
+      expect(
+          p.errorDetail, contains('可在设置关闭 GPU 加速后重新下载引擎（CPU 版）'));
+    });
+
+    test('build==cpu：不追加指引', () async {
+      final p = await startWithBuild('cpu');
+      await p.confirmAndStart(
+        runOverride: (_, _) async =>
+            throw const WhisperException('whisper.cpp 退出码 1', 'boom'),
+        saveNote: (r) async => null,
+      );
+      expect(p.errorMessage, '转换失败');
+      expect(p.errorDetail, isNot(contains('关闭 GPU 加速')));
     });
   });
 }
@@ -1324,12 +1614,22 @@ class _HangingDownloader extends MediaDownloader {
 }
 
 /// downloadTool 间谍：仅计数不执行（隔离网络/文件副作用，验证切换联动触发）。
+/// [installedBuildOnDownload] 模拟真实下载安装后的落位构建（写回设置）。
 class _SpyDownloadProvider extends MediaImportProvider {
   int downloadCalls = 0;
-  _SpyDownloadProvider({super.toolService, super.modelService});
+  String? installedBuildOnDownload;
+  _SpyDownloadProvider({
+    super.toolService,
+    super.modelService,
+    super.isWindowsOverride,
+  });
   @override
   Future<void> downloadTool(MediaToolKind kind) async {
     downloadCalls++;
+    final build = installedBuildOnDownload;
+    if (kind == MediaToolKind.whisperCli && build != null) {
+      await settings.setWhisperBuild(build);
+    }
   }
 }
 

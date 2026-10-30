@@ -216,7 +216,9 @@ class MediaToolService {
       final r = await run(path, switch (kind) {
         MediaToolKind.ffmpeg => ['-version'],
         MediaToolKind.ytDlp => ['--version'],
-        MediaToolKind.whisperCli => ['--help'],
+        // whisper 探测用 --version（--help 不输出版本）：取得真实版本号，
+        // 作为 Mac Metal 版本黑名单键的依据
+        MediaToolKind.whisperCli => ['--version'],
       },
           workingDirectory: kind == MediaToolKind.whisperCli
               ? File(path).parent.path
@@ -225,7 +227,8 @@ class MediaToolService {
       final version = switch (kind) {
         MediaToolKind.ffmpeg => parseFfmpegVersion(r.stdout),
         MediaToolKind.ytDlp => parseYtDlpVersion(r.stdout),
-        MediaToolKind.whisperCli => 'ready',
+        // 解析失败兜底 'ready'：仅表示可执行验证通过（历史缓存兼容）
+        MediaToolKind.whisperCli => parseWhisperVersion(r.stdout) ?? 'ready',
       };
       if (version == null) return null;
       return MediaToolStatus(
@@ -284,6 +287,10 @@ class MediaToolService {
 
   static String? parseFfmpegVersion(String stdout) =>
       RegExp(r'ffmpeg version (\S+)').firstMatch(stdout)?.group(1);
+
+  /// 解析 whisper.cpp `--version` 输出（`whisper.cpp version: 1.9.5 (built ...)`）。
+  static String? parseWhisperVersion(String stdout) =>
+      RegExp(r'version:\s*(\S+)').firstMatch(stdout)?.group(1);
 
   static String? parseYtDlpVersion(String stdout) {
     final t = stdout.trim();
