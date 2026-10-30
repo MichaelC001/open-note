@@ -55,6 +55,10 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
       final busyNow = p.operationInProgress;
       if (!busyNow) p.checkEnvironment();
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<MediaImportProvider>().ensureWhisperMetalProbe();
+    });
   }
 
   Future<void> _load() async {
@@ -337,14 +341,17 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
     );
   }
 
-  /// GPU 加速开关行（引擎区尾部）：平台无支持时整体不渲染（linux）或
-  /// 禁灰（Windows 无 N 卡），副标题按平台/能力取文案。
+  /// GPU 加速开关行（引擎区尾部）：linux 不渲染；Windows 无 N 卡禁灰；
+  /// Mac 按探测结论三态——探测中/版本黑名单命中均禁灰并给出原因副标题。
   Widget _gpuSwitchTile(
       MediaImportProvider p, Translations t, String platformKey) {
     final kind = _gpuKind!;
+    final probing = platformKey == 'macos' && p.metalProbeRunning;
+    final unavailableVersion =
+        platformKey == 'macos' ? p.whisperMetalUnavailableVersion : null;
     final supported = switch (platformKey) {
       'windows' => kind == GpuKind.cuda,
-      'macos' => true,
+      'macos' => !probing && unavailableVersion == null,
       _ => false,
     };
     final subtitle = switch (platformKey) {
@@ -352,6 +359,12 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
         supported
             ? t.media_settings_gpuSubtitleCuda
             : t.media_settings_gpuSubtitleNoCuda,
+      'macos' => unavailableVersion != null
+          ? t.media_settings_gpuSubtitleMetalUnavailable(
+              version: unavailableVersion)
+          : probing
+              ? t.media_settings_gpuSubtitleMetalProbing
+              : t.media_settings_gpuSubtitleMetal,
       _ => t.media_settings_gpuSubtitleMetal,
     };
     return SwitchListTile(
@@ -359,7 +372,7 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
       dense: true,
       title: Text(t.media_settings_gpuAccelerate),
       subtitle: Text(subtitle),
-      value: _whisperGpu,
+      value: unavailableVersion != null ? false : _whisperGpu,
       activeThumbColor: DesignTokens.primary500,
       thumbColor: const WidgetStatePropertyAll(Colors.white),
       onChanged: !supported

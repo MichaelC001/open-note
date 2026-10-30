@@ -3168,6 +3168,12 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 	/// zh: '使用 Metal GPU 加速语音识别'
 	String get media_settings_gpuSubtitleMetal => '使用 Metal GPU 加速语音识别';
 
+	/// zh: '当前版本（{version}）的 Metal 加速不可用，已自动使用 CPU'
+	String media_settings_gpuSubtitleMetalUnavailable({required Object version}) => '当前版本（${version}）的 Metal 加速不可用，已自动使用 CPU';
+
+	/// zh: '正在检测 Metal 加速可用性…'
+	String get media_settings_gpuSubtitleMetalProbing => '正在检测 Metal 加速可用性…';
+
 	/// zh: '下载已在后台进行，可在 设置→视频转笔记 查看进度'
 	String get media_env_background => '下载已在后台进行，可在 设置→视频转笔记 查看进度';
 

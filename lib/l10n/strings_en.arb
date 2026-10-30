@@ -2426,6 +2426,13 @@
   "media_settings_gpuSubtitleCuda": "Accelerate speech recognition with NVIDIA CUDA",
   "media_settings_gpuSubtitleNoCuda": "No NVIDIA GPU detected",
   "media_settings_gpuSubtitleMetal": "Accelerate speech recognition with Metal",
+  "media_settings_gpuSubtitleMetalUnavailable": "Metal acceleration is unavailable in this version ({version}); using CPU automatically",
+  "@media_settings_gpuSubtitleMetalUnavailable": {
+    "placeholders": {
+      "version": {}
+    }
+  },
+  "media_settings_gpuSubtitleMetalProbing": "Checking Metal acceleration availability…",
   "media_env_background":
       "Download continues in the background. Check Settings → Video to Note for progress.",
   "media_env_uninstall": "Uninstall",

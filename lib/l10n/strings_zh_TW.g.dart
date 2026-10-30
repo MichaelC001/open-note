@@ -1849,6 +1849,8 @@ class TranslationsZhTw extends Translations with BaseTranslations<AppLocale, Tra
 	@override String get media_settings_gpuSubtitleCuda => '使用 NVIDIA CUDA 加速語音識別';
 	@override String get media_settings_gpuSubtitleNoCuda => '未偵測到 NVIDIA GPU';
 	@override String get media_settings_gpuSubtitleMetal => '使用 Metal GPU 加速語音識別';
+	@override String media_settings_gpuSubtitleMetalUnavailable({required Object version}) => '目前版本（${version}）的 Metal 加速不可用，已自動使用 CPU';
+	@override String get media_settings_gpuSubtitleMetalProbing => '正在偵測 Metal 加速可用性…';
 	@override String get media_env_background => '下載已在背景進行，可在 設定→影片轉筆記 查看進度';
 	@override String get media_env_uninstall => '解除安裝';
 	@override String get media_env_finishing => '下載完成 · 安裝中…';

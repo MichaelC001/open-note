@@ -577,6 +577,8 @@ class MediaImportProvider extends ChangeNotifier {
   /// 构建记录 unknown（旧版本升级用户）不自动重装，提示重下后生效。
   Future<void> setWhisperGpuEnabled(bool v) async {
     await settings.setWhisperGpu(v);
+    // 打开开关时主动触发 Metal 实测（守卫幂等；黑名单/OK 缓存防重复探测）
+    if (v) unawaited(ensureWhisperMetalProbe());
     final st = toolStatuses[MediaToolKind.whisperCli];
     if (st == null || st.source != MediaToolSource.appManaged) {
       return;

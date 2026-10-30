@@ -131,6 +131,7 @@ class _FakeGpuDetector extends GpuCapabilityDetector {
 class _SpyGpuProvider extends MediaImportProvider {
   int gpuToggleCalls = 0;
   bool? lastGpuToggleValue;
+  int probeCalls = 0;
 
   _SpyGpuProvider({
     required super.toolService,
@@ -143,6 +144,20 @@ class _SpyGpuProvider extends MediaImportProvider {
     gpuToggleCalls++;
     lastGpuToggleValue = v;
     await settings.setWhisperGpu(v);
+  }
+
+  @override
+  Future<void> ensureWhisperMetalProbe() async {
+    probeCalls++;
+    return super.ensureWhisperMetalProbe();
+  }
+
+  // checkEnvironment 完成后的真实重算（refreshWhisperMetalState）会按
+  // 设置表清空手工置入的黑名单缓存，故在 pump 稳定后经此注入命中值，
+  // 等价真实「命中→notify」链路
+  void setMetalUnavailableVersionForTest(String version) {
+    whisperMetalUnavailableVersion = version;
+    notifyListeners();
   }
 }
 
@@ -558,6 +573,63 @@ void main() {
           of: find.text('GPU 加速'), matching: find.byType(SwitchListTile)));
       expect(tile.onChanged, isNotNull);
       expect(find.text('使用 NVIDIA CUDA 加速语音识别'), findsOneWidget);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('Mac：版本黑名单命中 → 开关 OFF+置灰+副标题含版本', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    try {
+      final provider = makeSpyProvider(
+          gpuDetector:
+              _FakeGpuDetector(const GpuCapability(kind: GpuKind.metal)));
+      await pumpTab(tester, provider);
+
+      provider.setMetalUnavailableVersionForTest('1.9.5');
+      await tester.pump();
+
+      final tile = tester.widget<SwitchListTile>(find.ancestor(
+          of: find.text('GPU 加速'), matching: find.byType(SwitchListTile)));
+      expect(tile.value, isFalse);
+      expect(tile.onChanged, isNull);
+      expect(find.text('当前版本（1.9.5）的 Metal 加速不可用，已自动使用 CPU'),
+          findsOneWidget);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('Mac：探测进行中 → 置灰+探测文案副标题', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    try {
+      final provider = makeSpyProvider(
+          gpuDetector:
+              _FakeGpuDetector(const GpuCapability(kind: GpuKind.metal)));
+      provider.metalProbeRunning = true;
+      await pumpTab(tester, provider);
+
+      final tile = tester.widget<SwitchListTile>(find.ancestor(
+          of: find.text('GPU 加速'), matching: find.byType(SwitchListTile)));
+      expect(tile.onChanged, isNull);
+      expect(find.text('正在检测 Metal 加速可用性…'), findsOneWidget);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('Mac：打开 GPU 开关触发一次 Metal 探测', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    try {
+      final provider = makeSpyProvider(
+          gpuDetector:
+              _FakeGpuDetector(const GpuCapability(kind: GpuKind.metal)));
+      await pumpTab(tester, provider);
+
+      await tester.tap(find.text('GPU 加速'));
+      await tester.pump();
+
+      expect(provider.probeCalls, 1);
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }

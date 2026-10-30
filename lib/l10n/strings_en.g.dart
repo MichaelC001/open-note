@@ -1855,6 +1855,8 @@ class TranslationsEn extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get media_settings_gpuSubtitleCuda => 'Accelerate speech recognition with NVIDIA CUDA';
 	@override String get media_settings_gpuSubtitleNoCuda => 'No NVIDIA GPU detected';
 	@override String get media_settings_gpuSubtitleMetal => 'Accelerate speech recognition with Metal';
+	@override String media_settings_gpuSubtitleMetalUnavailable({required Object version}) => 'Metal acceleration is unavailable in this version (${version}); using CPU automatically';
+	@override String get media_settings_gpuSubtitleMetalProbing => 'Checking Metal acceleration availability…';
 	@override String get media_env_background => 'Download continues in the background. Check Settings → Video to Note for progress.';
 	@override String get media_env_uninstall => 'Uninstall';
 	@override String get media_env_finishing => 'Downloaded · Installing…';

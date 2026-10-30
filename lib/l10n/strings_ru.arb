@@ -2418,6 +2418,13 @@
   "media_settings_gpuSubtitleCuda": "Ускорение распознавания речи через NVIDIA CUDA",
   "media_settings_gpuSubtitleNoCuda": "Видеокарта NVIDIA не обнаружена",
   "media_settings_gpuSubtitleMetal": "Ускорение распознавания речи через Metal",
+  "media_settings_gpuSubtitleMetalUnavailable": "Ускорение Metal недоступно в этой версии ({version}); используется CPU",
+  "@media_settings_gpuSubtitleMetalUnavailable": {
+    "placeholders": {
+      "version": {}
+    }
+  },
+  "media_settings_gpuSubtitleMetalProbing": "Проверка доступности ускорения Metal…",
   "media_env_background": "Загрузка продолжается в фоне: Настройки → Видео в заметку.",
   "media_env_uninstall": "Удалить",
   "media_env_finishing": "Скачано · Установка…",

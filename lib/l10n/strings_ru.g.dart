@@ -1849,6 +1849,8 @@ class TranslationsRu extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get media_settings_gpuSubtitleCuda => 'Ускорение распознавания речи через NVIDIA CUDA';
 	@override String get media_settings_gpuSubtitleNoCuda => 'Видеокарта NVIDIA не обнаружена';
 	@override String get media_settings_gpuSubtitleMetal => 'Ускорение распознавания речи через Metal';
+	@override String media_settings_gpuSubtitleMetalUnavailable({required Object version}) => 'Ускорение Metal недоступно в этой версии (${version}); используется CPU';
+	@override String get media_settings_gpuSubtitleMetalProbing => 'Проверка доступности ускорения Metal…';
 	@override String get media_env_background => 'Загрузка продолжается в фоне: Настройки → Видео в заметку.';
 	@override String get media_env_uninstall => 'Удалить';
 	@override String get media_env_finishing => 'Скачано · Установка…';
