@@ -129,9 +129,13 @@ class MediaDownloader {
   }
 
   static String? pickWhisperAsset(List<String> names,
-      {required bool isWindows, required bool isMac, required bool isArm}) {
+      {required bool isWindows,
+      required bool isMac,
+      required bool isArm,
+      bool preferCuda = false}) {
     final candidates = MediaToolCandidates.whisper(names,
-        isWindows: isWindows, isMac: isMac, isArm: isArm);
+        isWindows: isWindows, isMac: isMac, isArm: isArm,
+        preferCuda: preferCuda);
     return candidates.isEmpty ? null : candidates.first;
   }
 
@@ -253,10 +257,14 @@ class _DigestConsumer implements Sink<crypto.Digest> {
 /// whisper 资产筛选纯函数（media_tool_service 与 media_downloader 共用）。
 class MediaToolCandidates {
   static List<String> whisper(List<String> names,
-      {required bool isWindows, required bool isMac, required bool isArm}) {
+      {required bool isWindows,
+      required bool isMac,
+      required bool isArm,
+      bool preferCuda = false}) {
     // cuda 进主排除（CUDA 包 ggml-cuda.dll 依赖 NVIDIA 驱动，无 N 卡进程
     // 无法启动 → 校验失败），单独作兜底层：无纯 CPU 包可用时仍可下载尝试。
     // x64 主层不要求 'win' 子串——纯 CPU 包名为 whisper-bin-x64.zip。
+    // preferCuda（GPU 开关∧N 卡能力）时两层顺序对调：cuda 包优先。
     final bad =
         RegExp(r'cuda|blas|win32|xcframework|adreno|cublas|vulkan|clblast|opencl|wasm|addon');
     if (isWindows) {
@@ -278,7 +286,7 @@ class MediaToolCandidates {
           cuda.add(n);
         }
       }
-      return [...main, ...cuda];
+      return preferCuda ? [...cuda, ...main] : [...main, ...cuda];
     }
     return names.where((n) {
       if (bad.hasMatch(n)) return false;

@@ -267,6 +267,26 @@ void main() {
           ['whisper-bin-win-cuda-13.4-arm64.zip'],
           reason: '仅 cuda arm64 时兜底命中');
     });
+
+    test('preferCuda=true 时 cuda x64 层优先于纯 CPU 层', () {
+      final names = ['whisper-bin-x64.zip', 'whisper-bin-win-cuda-12.4.0-x64.zip', 'whisper-blas-bin-x64.zip'];
+      expect(MediaToolCandidates.whisper(names, isWindows: true, isMac: false, isArm: false, preferCuda: true).first,
+          'whisper-bin-win-cuda-12.4.0-x64.zip');
+      expect(MediaToolCandidates.whisper(names, isWindows: true, isMac: false, isArm: false).first,
+          'whisper-bin-x64.zip');
+    });
+
+    test('pickWhisperAsset preferCuda 透传', () {
+      const names = ['whisper-bin-x64.zip', 'whisper-bin-win-cuda-12.4.0-x64.zip'];
+      expect(
+          MediaDownloader.pickWhisperAsset(names,
+              isWindows: true, isMac: false, isArm: false, preferCuda: true),
+          'whisper-bin-win-cuda-12.4.0-x64.zip');
+      expect(
+          MediaDownloader.pickWhisperAsset(names,
+              isWindows: true, isMac: false, isArm: false),
+          'whisper-bin-x64.zip');
+    });
   });
 
   group('sha256File / parseDfK', () {
