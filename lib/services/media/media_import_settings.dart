@@ -16,6 +16,10 @@ class MediaImportSettings {
   static const _kLastUpdateCheckAt = 'media_tool_last_update_check_at';
   static const _kWhisperSourceTag = 'media_tool_whisper_cli_source_tag';
   static const _kUpdateAvailable = 'media_tool_update_available';
+  static const _kWhisperGpu = 'media_whisper_gpu';
+  static const _kGpuUnavailable = 'media_gpu_unavailable_versions';
+  static const _kWhisperBuild = 'media_tool_whisper_build';
+  static const _kGpuDetectCache = 'media_gpu_detect_cache';
 
   /// 工具验证缓存（kind -> JSON 条目），避免每次检测 spawn 慢二进制。
   Future<Map<String, String>> readVerifyCache() async {
@@ -133,5 +137,64 @@ class MediaImportSettings {
     } catch (_) {
       // 持久化失败静默：徽标是辅助信息，不阻塞主流程
     }
+  }
+
+  /// GPU 加速总开关（默认开启；无能力环境由 UI 禁灰，能力探测不在此判断）。
+  Future<bool> whisperGpu() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_kWhisperGpu) ?? true;
+  }
+
+  Future<void> setWhisperGpu(bool v) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kWhisperGpu, v);
+  }
+
+  /// GPU 不可用缓存（键 `平台:标识` → 原因摘要），命中后该平台+版本直接走 CPU。
+  Future<Map<String, String>> gpuUnavailableVersions() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kGpuUnavailable);
+    if (raw == null) return {};
+    try {
+      return Map<String, String>.from(jsonDecode(raw) as Map);
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// 追加一条不可用记录（保留既有键，仅覆盖同键值）。
+  Future<void> markGpuUnavailable(String key, String reason) async {
+    final table = await gpuUnavailableVersions();
+    table[key] = reason;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kGpuUnavailable, jsonEncode(table));
+  }
+
+  /// 已装 whisper 构建（`cpu` / `cuda`）；null 表示 unknown（不参与切换联动）。
+  Future<String?> whisperBuild() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_kWhisperBuild);
+  }
+
+  Future<void> setWhisperBuild(String build) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kWhisperBuild, build);
+  }
+
+  /// GPU 能力探测缓存（含 atMs 时间戳，24h 节流复测）；null 表示从未探测。
+  Future<Map<String, dynamic>?> gpuDetectCache() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kGpuDetectCache);
+    if (raw == null) return null;
+    try {
+      return Map<String, dynamic>.from(jsonDecode(raw) as Map);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> setGpuDetectCache(Map<String, dynamic> cache) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kGpuDetectCache, jsonEncode(cache));
   }
 }

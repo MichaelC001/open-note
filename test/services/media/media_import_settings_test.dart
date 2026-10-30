@@ -37,4 +37,39 @@ void main() {
       expect(await s.readUpdateAvailable(), isEmpty);
     });
   });
+
+  group('whisper GPU 设置键', () {
+    test('whisperGpu 默认 true，set 后读回一致', () async {
+      final s = MediaImportSettings();
+      expect(await s.whisperGpu(), isTrue);
+      await s.setWhisperGpu(false);
+      expect(await s.whisperGpu(), isFalse);
+      await s.setWhisperGpu(true);
+      expect(await s.whisperGpu(), isTrue);
+    });
+
+    test('markGpuUnavailable 两次写入合并为 2 键', () async {
+      final s = MediaImportSettings();
+      await s.markGpuUnavailable('mac:1.9.5', 'Metal 崩溃');
+      await s.markGpuUnavailable('win:b5454', 'CUDA 校验失败');
+      expect(await s.gpuUnavailableVersions(), {
+        'mac:1.9.5': 'Metal 崩溃',
+        'win:b5454': 'CUDA 校验失败',
+      });
+    });
+
+    test('whisperBuild 未写入为 null，写入后读回', () async {
+      final s = MediaImportSettings();
+      expect(await s.whisperBuild(), isNull);
+      await s.setWhisperBuild('cuda');
+      expect(await s.whisperBuild(), 'cuda');
+    });
+
+    test('gpuDetectCache 未写入为 null，写入后读回', () async {
+      final s = MediaImportSettings();
+      expect(await s.gpuDetectCache(), isNull);
+      await s.setGpuDetectCache({'atMs': 123, 'kind': 'metal'});
+      expect(await s.gpuDetectCache(), {'atMs': 123, 'kind': 'metal'});
+    });
+  });
 }
