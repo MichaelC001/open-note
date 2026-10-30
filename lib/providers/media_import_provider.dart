@@ -8,6 +8,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../services/media/download_stats.dart';
+import '../services/media/gpu_capability.dart';
 import '../services/media/media_downloader.dart';
 import '../services/media/media_import_service.dart';
 import '../services/media/media_import_settings.dart';
@@ -39,6 +40,12 @@ class MediaImportProvider extends ChangeNotifier {
   final Future<String?> Function() wingetPathResolver;
   final ToolUpdateService updateService;
   final DateTime Function() clock;
+  /// whisper 资产解析注入点（测试隔离网络；null 走 GitHub releases 真实解析）。
+  final Future<({String url, String build})> Function()? whisperAssetResolver;
+  /// Windows 专属安装链路（CUDA 回退）的平台覆写（测试注入）。
+  final bool? isWindowsOverride;
+  /// GPU 能力探测器覆写（测试注入；null 走 nvidia-smi/Mac 恒 metal 默认实现）。
+  final GpuCapabilityDetector? gpuDetector;
 
   MediaImportProvider({
     MediaToolService? toolService,
@@ -50,6 +57,9 @@ class MediaImportProvider extends ChangeNotifier {
     Future<String?> Function()? wingetPathResolver,
     ToolUpdateService? updateService,
     DateTime Function()? clock,
+    this.whisperAssetResolver,
+    this.isWindowsOverride,
+    this.gpuDetector,
   }) : toolService = toolService ?? _defaultToolService(),
        modelService = modelService ?? WhisperModelService(),
        downloader = downloader ?? MediaDownloader(),
@@ -114,6 +124,28 @@ class MediaImportProvider extends ChangeNotifier {
   Process? _activeInstaller;
   MediaImportService? _activeService;
   bool _busy = false;
+  // CUDA 包安装后校验失败回退 CPU 的单次守卫（防递归重装）
+  bool _whisperFallbackBusy = false;
+
+  /// GPU 能力探测器：默认接 settings 检测缓存与 nvidia-smi 探测（24h 节流）。
+  late final GpuCapabilityDetector _gpuDetector = gpuDetector ??
+      GpuCapabilityDetector(
+        readCache: settings.gpuDetectCache,
+        writeCache: settings.setGpuDetectCache,
+        runProbe: _defaultGpuProbe,
+        now: clock,
+      );
+
+  bool get _isWinFlow => isWindowsOverride ?? Platform.isWindows;
+
+  static Future<ProcessRunResult> _defaultGpuProbe(
+    String exe,
+    List<String> args,
+  ) async {
+    final r = await Process.run(exe, args);
+    return ProcessRunResult(
+        r.exitCode, r.stdout.toString(), r.stderr.toString());
+  }
 
   bool get busy => _busy;
 
@@ -330,13 +362,25 @@ class MediaImportProvider extends ChangeNotifier {
           : 200 * 1024 * 1024;
 
   Future<void> downloadTool(MediaToolKind kind) async {
+    final installedBuild = await _downloadToolInternal(kind);
+    // Windows：CUDA 包安装后自动重检失败（老驱动无法加载 ggml-cuda.dll 常见）
+    // → 写 win:tag 黑名单并单次回退 CPU 重装；_whisperFallbackBusy 防递归。
+    if (kind == MediaToolKind.whisperCli &&
+        installedBuild == 'cuda' &&
+        _isWinFlow &&
+        !(toolStatuses[kind]?.ready ?? false)) {
+      await _fallbackWhisperToCpuAfterFailedVerify();
+    }
+  }
+
+  Future<String?> _downloadToolInternal(MediaToolKind kind) async {
     // 操作占用守卫：下载/安装/finishing 收尾/卸载期间重复触发直接忽略
     //（防 finishing 窗口内重复点击「更新」造成二次下载/状态互踩）
     if ((toolDownloading[kind] ?? false) ||
         (toolInstalling[kind] ?? false) ||
         (toolFinishing[kind] ?? false) ||
         (toolUninstalling[kind] ?? false)) {
-      return;
+      return null;
     }
     // 先取检测到的更新 tag 再清徽标：ffmpeg「更新」按该具体 tag 下载
     final updateTag = updateAvailableVersion.remove(kind);
@@ -349,6 +393,8 @@ class MediaImportProvider extends ChangeNotifier {
     _downloadTrackers['tool:${kind.name}'] = DownloadSpeedTracker();
     errorMessage = null;
     _notify();
+    // 本次 whisper 安装实际落位的构建（cuda/cpu）；安装失败/非 whisper 为 null
+    String? installedBuild;
     try {
       final dir = await toolService.toolDir(kind);
       // 磁盘空间预检：按工具分级阈值，不足直接阻止下载
@@ -359,7 +405,7 @@ class MediaImportProvider extends ChangeNotifier {
         errorDetail =
             '需要约 ${needBytes ~/ (1024 * 1024)} MB，可用 '
             '${free ~/ (1024 * 1024)} MB';
-        return;
+        return null;
       }
       _downloadCancel = CancelToken();
       final binName = toolService.binaryName(kind);
@@ -404,7 +450,8 @@ class MediaImportProvider extends ChangeNotifier {
           await Process.run('chmod', ['+x', dest.path]);
         }
       } else {
-        final directUrl = await _resolveWhisperAssetUrl();
+        final picked = await _resolveWhisperAssetUrl();
+        final directUrl = picked.url;
         final archiveName = destNameOf(directUrl);
         final archive = File('$dir/$archiveName');
         await downloader.download(
@@ -443,6 +490,11 @@ class MediaImportProvider extends ChangeNotifier {
         if (installed == null) {
           throw Exception('安装包中未找到 $binName，请改用手动安装指引');
         }
+        // 安装成功即记录本次构建（切换联动与 CUDA 回退判定的依据）
+        installedBuild = picked.build;
+        try {
+          await settings.setWhisperBuild(picked.build);
+        } catch (_) {}
       }
       toolStatuses[kind] =
           await toolService.check(kind, forceVerify: true);
@@ -475,7 +527,69 @@ class MediaImportProvider extends ChangeNotifier {
       _downloadTrackers.remove('tool:${kind.name}');
       _notify();
     }
+    return installedBuild;
   }
+
+  /// CUDA 包安装后校验失败的自动回退：按本次 release tag 记入 GPU 不可用
+  /// 黑名单（下次选包强制 CPU），随后重走一次下载安装；守卫位防递归。
+  Future<void> _fallbackWhisperToCpuAfterFailedVerify() async {
+    if (_whisperFallbackBusy) return;
+    final tag = await settings.whisperCliSourceTag();
+    if (tag != null) {
+      try {
+        await settings.markGpuUnavailable(
+          gpuUnavailableKeyWin(tag),
+          'CUDA 版安装校验失败（驱动可能过旧）',
+        );
+      } catch (_) {}
+    }
+    _whisperFallbackBusy = true;
+    try {
+      await _downloadToolInternal(MediaToolKind.whisperCli);
+      if (toolStatuses[MediaToolKind.whisperCli]?.ready ?? false) {
+        toolHints[MediaToolKind.whisperCli] =
+            'CUDA 版启动失败（驱动可能过旧），已回退 CPU 版';
+        _notify();
+      }
+    } finally {
+      _whisperFallbackBusy = false;
+    }
+  }
+
+  /// 设置页 GPU 加速开关：写设置后按已装构建联动重装。
+  /// 仅 appManaged（便携版）参与包选择；systemPath（winget/brew）只写设置；
+  /// 构建记录 unknown（旧版本升级用户）不自动重装，提示重下后生效。
+  Future<void> setWhisperGpuEnabled(bool v) async {
+    await settings.setWhisperGpu(v);
+    final st = toolStatuses[MediaToolKind.whisperCli];
+    if (st == null || st.source != MediaToolSource.appManaged) {
+      return;
+    }
+    final stored = await settings.whisperBuild();
+    if (stored == null) {
+      toolHints[MediaToolKind.whisperCli] = '重新下载引擎后生效';
+      _notify();
+      return;
+    }
+    if (!reinstallNeeded(stored, expectedWhisperBuild(useGpu: v))) {
+      return;
+    }
+    await downloadTool(MediaToolKind.whisperCli);
+    // 提示在下载完成后设置：downloadTool 开头会清 toolHints
+    if (toolStatuses[MediaToolKind.whisperCli]?.ready ?? false) {
+      toolHints[MediaToolKind.whisperCli] =
+          v ? '正在切换 CUDA 版本' : '正在切换 CPU 版本';
+      _notify();
+    }
+  }
+
+  /// GPU 开关对应的期望引擎构建（Windows 安装层选包依据）。
+  static String expectedWhisperBuild({required bool useGpu}) =>
+      useGpu ? 'cuda' : 'cpu';
+
+  /// 已装构建与期望不一致时需重装；无构建记录（unknown）不自动重装。
+  static bool reinstallNeeded(String? stored, String expected) =>
+      stored != null && stored != expected;
 
   /// 1a 装前可执行验证：mac/linux `chmod +x` 后执行 `-version`（超时 5s），
   /// windows 复制到同目录临时 `.exe` 再探测（PE 必须以 .exe 结尾才能启动）。
@@ -770,7 +884,18 @@ class MediaImportProvider extends ChangeNotifier {
     }
   }
 
-  Future<String> _resolveWhisperAssetUrl() async {
+  /// 解析本次 whisper 安装包：useGpu = GPU 开关 ∧ 能力（Windows==cuda），
+  /// 再按 release tag 黑名单逐 release 强制回 CPU 选包。
+  /// 返回直链与本次构建（cuda/cpu，按实际选中资产）。
+  Future<({String url, String build})> _resolveWhisperAssetUrl() async {
+    final override = whisperAssetResolver;
+    if (override != null) return override();
+    final gpuOn = await settings.whisperGpu();
+    final capable = !_isWinFlow ||
+        (await _gpuDetector.detect()).kind == GpuKind.cuda;
+    final useGpu = gpuOn && capable;
+    final unavailableKeys =
+        (await settings.gpuUnavailableVersions()).keys.toSet();
     final candidates = MediaDownloader.whisperApiCandidates(
       MediaDownloader.whisperReleasesApiUrl(),
       mode: await settings.downloadSource(),
@@ -797,29 +922,49 @@ class MediaImportProvider extends ChangeNotifier {
         lastError = e;
         continue;
       }
-      final downloadUrl = _pickWhisperDownloadUrl(releases);
-      if (downloadUrl != null) return downloadUrl;
+      final picked = pickWhisperDownloadUrl(
+        releases,
+        preferCuda: useGpu,
+        gpuUnavailableKeys: unavailableKeys,
+      );
+      if (picked != null) return picked;
       throw Exception('当前平台暂无 whisper.cpp 预编译包，请查看安装指引手动安装');
     }
     throw Exception(
         '无法获取 whisper.cpp 版本列表（已尝试 GitHub 直连与 gh-proxy 镜像）：$lastError');
   }
 
-  static String? _pickWhisperDownloadUrl(List<dynamic> releases) {
+  /// release 列表选包纯函数：preferCuda 时 cuda 层优先；黑名单命中
+  /// `win:tag` 的 release 强制按 CPU 选。build 取自实际选中资产名。
+  static ({String url, String build})? pickWhisperDownloadUrl(
+    List<dynamic> releases, {
+    required bool preferCuda,
+    required Set<String> gpuUnavailableKeys,
+    bool? isWindows,
+    bool? isMac,
+    bool? isArm,
+  }) {
     for (final release in releases) {
       final map = release as Map;
+      final tag = map['tag_name']?.toString() ?? '';
       final assets = ((map['assets'] as List?) ?? const [])
           .map((a) => (a as Map)['name'].toString())
           .toList();
+      final prefer = preferCuda &&
+          !gpuUnavailableKeys.contains(gpuUnavailableKeyWin(tag));
       final asset = MediaDownloader.pickWhisperAsset(
         assets,
-        isWindows: Platform.isWindows,
-        isMac: Platform.isMacOS,
-        isArm: _isArmHost,
+        isWindows: isWindows ?? Platform.isWindows,
+        isMac: isMac ?? Platform.isMacOS,
+        isArm: isArm ?? _isArmHost,
+        preferCuda: prefer,
       );
       if (asset != null) {
-        return 'https://github.com/ggml-org/whisper.cpp/releases/download/'
-            '${map['tag_name']}/$asset';
+        return (
+          url: 'https://github.com/ggml-org/whisper.cpp/releases/download/'
+              '$tag/$asset',
+          build: asset.contains('cuda') ? 'cuda' : 'cpu',
+        );
       }
     }
     return null;

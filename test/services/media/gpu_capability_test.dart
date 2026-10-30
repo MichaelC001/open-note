@@ -23,6 +23,13 @@ void main() {
       expect(cap.driverVersion, '566.36');
       expect(cap.cudaVersion, isNull);
     });
+    test('CUDA Version 为 N/A 时归一为 null', () {
+      final cap = parseNvidiaSmi(
+          '| Driver Version: 566.36 | CUDA Version: N/A |');
+      expect(cap.kind, GpuKind.cuda);
+      expect(cap.driverVersion, '566.36');
+      expect(cap.cudaVersion, isNull);
+    });
   });
 
   group('黑名单键构造', () {
@@ -142,6 +149,16 @@ void main() {
       );
       final cap = await detector.detect();
       expect(cap.kind, GpuKind.none);
+    });
+
+    test('writeCache 抛错不影响探测结果返回', () async {
+      final detector = GpuCapabilityDetector(
+        readCache: () async => null,
+        writeCache: (c) async => throw Exception('disk full'),
+        runProbe: (exe, args) async => const ProcessRunResult(0, '', ''),
+      );
+      final cap = await detector.detect();
+      expect(cap.kind, Platform.isMacOS ? GpuKind.metal : GpuKind.none);
     });
   });
 }

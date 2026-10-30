@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:archive/archive.dart';
 import 'package:dio/dio.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -966,6 +967,208 @@ void main() {
       expect(hint, contains('模型目录：/tmp/models'));
     });
   });
+
+  group('whisper GPU 安装层纯函数', () {
+    test('expectedWhisperBuild：useGpu 映射 cuda/cpu', () {
+      expect(MediaImportProvider.expectedWhisperBuild(useGpu: true), 'cuda');
+      expect(MediaImportProvider.expectedWhisperBuild(useGpu: false), 'cpu');
+    });
+
+    test('reinstallNeeded：stored 非空且不等 expected 才重装（unknown 不重装）',
+        () {
+      expect(MediaImportProvider.reinstallNeeded('cuda', 'cpu'), isTrue);
+      expect(MediaImportProvider.reinstallNeeded('cpu', 'cuda'), isTrue);
+      expect(MediaImportProvider.reinstallNeeded('cpu', 'cpu'), isFalse);
+      expect(MediaImportProvider.reinstallNeeded(null, 'cpu'), isFalse);
+      expect(MediaImportProvider.reinstallNeeded(null, 'cuda'), isFalse);
+    });
+  });
+
+  group('pickWhisperDownloadUrl（GPU 选包与黑名单）', () {
+    const releases = [
+      {
+        'tag_name': 'b5454',
+        'assets': [
+          {'name': 'whisper-bin-x64.zip'},
+          {'name': 'whisper-bin-win-cuda-12.4.0-x64.zip'},
+        ],
+      },
+    ];
+
+    test('preferCuda=true → cuda 包优先且 build 记录 cuda', () {
+      final picked = MediaImportProvider.pickWhisperDownloadUrl(
+        releases,
+        preferCuda: true,
+        gpuUnavailableKeys: const {},
+        isWindows: true,
+        isMac: false,
+        isArm: false,
+      );
+      expect(picked!.url, contains('b5454/whisper-bin-win-cuda-12.4.0-x64.zip'));
+      expect(picked.build, 'cuda');
+    });
+
+    test('黑名单含 win:tag → 同 release 强制 CPU 选包', () {
+      final picked = MediaImportProvider.pickWhisperDownloadUrl(
+        releases,
+        preferCuda: true,
+        gpuUnavailableKeys: const {'win:b5454'},
+        isWindows: true,
+        isMac: false,
+        isArm: false,
+      );
+      expect(picked!.url, contains('b5454/whisper-bin-x64.zip'));
+      expect(picked.build, 'cpu');
+    });
+
+    test('preferCuda=false → 纯 CPU 包', () {
+      final picked = MediaImportProvider.pickWhisperDownloadUrl(
+        releases,
+        preferCuda: false,
+        gpuUnavailableKeys: const {},
+        isWindows: true,
+        isMac: false,
+        isArm: false,
+      );
+      expect(picked!.build, 'cpu');
+      expect(picked.url, contains('whisper-bin-x64.zip'));
+    });
+  });
+
+  group('setWhisperGpuEnabled 切换联动', () {
+    _SpyDownloadProvider makeSpy({Map<String, Object> prefs = const {}}) {
+      if (prefs.isNotEmpty) {
+        SharedPreferences.setMockInitialValues(prefs);
+      }
+      return _SpyDownloadProvider(
+        toolService: _ReadyToolService(() async => tmp.path),
+        modelService: _AllModelsService(() async => tmp.path),
+      );
+    }
+
+    test('appManaged 且已装 cuda：关 GPU 触发重装并提示正在切换', () async {
+      final p = makeSpy(prefs: {'media_tool_whisper_build': 'cuda'});
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+
+      await p.setWhisperGpuEnabled(false);
+
+      expect(p.downloadCalls, 1, reason: 'cuda→cpu 构建不匹配应重装');
+      expect(p.toolHints[MediaToolKind.whisperCli], contains('正在切换'));
+      expect(await MediaImportSettings().whisperGpu(), isFalse);
+    });
+
+    test('appManaged 且已装 cpu：关 GPU 不重装', () async {
+      final p = makeSpy(prefs: {'media_tool_whisper_build': 'cpu'});
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+
+      await p.setWhisperGpuEnabled(false);
+
+      expect(p.downloadCalls, 0);
+      expect(p.toolHints[MediaToolKind.whisperCli], isNull);
+    });
+
+    test('appManaged 且已装 cpu：开 GPU 触发重装', () async {
+      final p = makeSpy(prefs: {'media_tool_whisper_build': 'cpu'});
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+
+      await p.setWhisperGpuEnabled(true);
+
+      expect(p.downloadCalls, 1, reason: 'cpu→cuda 构建不匹配应重装');
+      expect(p.toolHints[MediaToolKind.whisperCli], contains('正在切换'));
+    });
+
+    test('构建记录 unknown（无记录）→ 不重装且提示重新下载引擎后生效', () async {
+      final p = makeSpy();
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+
+      await p.setWhisperGpuEnabled(false);
+
+      expect(p.downloadCalls, 0);
+      expect(p.toolHints[MediaToolKind.whisperCli], contains('重新下载引擎'));
+    });
+
+    test('systemPath 来源 → 仅写设置不联动', () async {
+      final p = _SpyDownloadProvider(
+        toolService: _SystemToolService(() async => tmp.path),
+        modelService: _AllModelsService(() async => tmp.path),
+      );
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+
+      await p.setWhisperGpuEnabled(false);
+
+      expect(p.downloadCalls, 0);
+      expect(p.toolHints[MediaToolKind.whisperCli], isNull);
+      expect(await MediaImportSettings().whisperGpu(), isFalse);
+    });
+  });
+
+  group('CUDA 包装后校验失败自动回退 CPU', () {
+    test('cuda 构建校验失败 → 写黑名单 + 单次重下 CPU + 回退提示', () async {
+      final tools = _FlakyVerifyToolService(() async => tmp.path, 1);
+      final fake = _ZipWritingDownloader('whisper-cli');
+      var resolverCalls = 0;
+      final p = MediaImportProvider(
+        toolService: tools,
+        modelService: _AllModelsService(() async => tmp.path),
+        downloader: fake,
+        whisperAssetResolver: () async {
+          resolverCalls++;
+          return resolverCalls == 1
+              ? (
+                  url: 'https://github.com/ggml-org/whisper.cpp/releases/'
+                      'download/b5454/whisper-bin-win-cuda-12.4.0-x64.zip',
+                  build: 'cuda',
+                )
+              : (
+                  url: 'https://github.com/ggml-org/whisper.cpp/releases/'
+                      'download/b5454/whisper-bin-x64.zip',
+                  build: 'cpu',
+                );
+        },
+        isWindowsOverride: true,
+      );
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+      p.toolStatuses[MediaToolKind.whisperCli] =
+          const MediaToolStatus.missing(MediaToolKind.whisperCli);
+
+      await p.downloadTool(MediaToolKind.whisperCli);
+
+      expect(fake.downloadCalls, 2, reason: 'CUDA 尝试 + CPU 回退各一次');
+      expect(resolverCalls, 2);
+      expect((await MediaImportSettings().gpuUnavailableVersions()).keys,
+          contains('win:b5454'));
+      expect(
+          p.toolHints[MediaToolKind.whisperCli], contains('已回退 CPU'));
+      expect(p.toolStatuses[MediaToolKind.whisperCli]!.ready, isTrue);
+      expect(await MediaImportSettings().whisperBuild(), 'cpu');
+      expect(p.errorMessage, isNull);
+    });
+
+    test('cuda 构建校验通过 → 记录 cuda 且不回退', () async {
+      final fake = _ZipWritingDownloader('whisper-cli');
+      final p = MediaImportProvider(
+        toolService: _ReadyToolService(() async => tmp.path),
+        modelService: _AllModelsService(() async => tmp.path),
+        downloader: fake,
+        whisperAssetResolver: () async => (
+          url: 'https://github.com/ggml-org/whisper.cpp/releases/'
+              'download/b5454/whisper-bin-win-cuda-12.4.0-x64.zip',
+          build: 'cuda',
+        ),
+        isWindowsOverride: true,
+      );
+      await p.startForFile(File('${tmp.path}/a.mp4'));
+      p.toolStatuses[MediaToolKind.whisperCli] =
+          const MediaToolStatus.missing(MediaToolKind.whisperCli);
+
+      await p.downloadTool(MediaToolKind.whisperCli);
+
+      expect(fake.downloadCalls, 1);
+      expect(await MediaImportSettings().whisperBuild(), 'cuda');
+      expect((await MediaImportSettings().gpuUnavailableVersions()), isEmpty);
+      expect(p.toolHints[MediaToolKind.whisperCli], isNull);
+    });
+  });
 }
 
 class _CountingFetcher {
@@ -1116,6 +1319,61 @@ class _HangingDownloader extends MediaDownloader {
     onProgress?.call(500, 1000);
     started.complete();
     await release.future;
+    return destFile;
+  }
+}
+
+/// downloadTool 间谍：仅计数不执行（隔离网络/文件副作用，验证切换联动触发）。
+class _SpyDownloadProvider extends MediaImportProvider {
+  int downloadCalls = 0;
+  _SpyDownloadProvider({super.toolService, super.modelService});
+  @override
+  Future<void> downloadTool(MediaToolKind kind) async {
+    downloadCalls++;
+  }
+}
+
+/// forceVerify 前 N 次返回未就绪（模拟 CUDA 包安装后启动校验失败），此后就绪。
+class _FlakyVerifyToolService extends _ReadyToolService {
+  int pendingFailures;
+  _FlakyVerifyToolService(super.base, this.pendingFailures);
+  @override
+  Future<MediaToolStatus> check(MediaToolKind kind,
+      {bool forceVerify = false}) async {
+    checkCount++;
+    if (forceVerify && pendingFailures > 0) {
+      pendingFailures--;
+      return MediaToolStatus.missing(kind);
+    }
+    return MediaToolStatus(
+      kind: kind,
+      ready: true,
+      path: 'fake',
+      version: '1',
+      source: MediaToolSource.appManaged,
+    );
+  }
+}
+
+/// 下载时写入含单个二进制条目的有效 zip（供真实解压+安装链路执行）。
+class _ZipWritingDownloader extends MediaDownloader {
+  final String entryName;
+  int downloadCalls = 0;
+  _ZipWritingDownloader(this.entryName);
+  @override
+  Future<File> download(
+    String directUrl, {
+    required File destFile,
+    MediaDownloadSourceMode mode = MediaDownloadSourceMode.auto,
+    void Function(int received, int total)? onProgress,
+    CancelToken? cancelToken,
+    String? expectedSha256,
+  }) async {
+    downloadCalls++;
+    await destFile.parent.create(recursive: true);
+    final archive = Archive()
+      ..addFile(ArchiveFile(entryName, 2, 'ok'.codeUnits));
+    await destFile.writeAsBytes(ZipEncoder().encode(archive));
     return destFile;
   }
 }

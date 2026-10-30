@@ -45,11 +45,12 @@ GpuCapability parseNvidiaSmi(String stdout) {
   }
   final driver =
       RegExp(r'Driver Version:\s*(\S+)').firstMatch(stdout)?.group(1);
-  final cuda = RegExp(r'CUDA Version:\s*(\S+)').firstMatch(stdout)?.group(1);
+  final cudaRaw = RegExp(r'CUDA Version:\s*(\S+)').firstMatch(stdout)?.group(1);
   return GpuCapability(
     kind: GpuKind.cuda,
     driverVersion: driver,
-    cudaVersion: cuda,
+    // 部分驱动输出 CUDA Version: N/A，归一为 null 语义更准（无有效 CUDA 版本）
+    cudaVersion: (cudaRaw == null || cudaRaw == 'N/A') ? null : cudaRaw,
   );
 }
 
@@ -89,8 +90,12 @@ class GpuCapabilityDetector {
       }
     }
     final cap = await _probe();
-    final entry = cap.toCache()..['atMs'] = _now().millisecondsSinceEpoch;
-    await writeCache(entry);
+    try {
+      final entry = cap.toCache()..['atMs'] = _now().millisecondsSinceEpoch;
+      await writeCache(entry);
+    } catch (_) {
+      // 缓存写失败不影响探测结论：仅损失 24h 节流（下次会重复探测）
+    }
     return cap;
   }
 
