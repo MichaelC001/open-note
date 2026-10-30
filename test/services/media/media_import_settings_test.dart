@@ -72,4 +72,17 @@ void main() {
       expect(await s.gpuDetectCache(), {'atMs': 123, 'kind': 'metal'});
     });
   });
+
+  group('metalOkVersions / markMetalOk', () {
+    test('空表默认 + 追加 roundtrip + 同键覆盖', () async {
+      final s = MediaImportSettings();
+      expect(await s.metalOkVersions(), isEmpty);
+      await s.markMetalOk('1.9.4');
+      await s.markMetalOk('1.9.4');
+      await s.markMetalOk('1.9.5');
+      final t = await s.metalOkVersions();
+      expect(t.keys, containsAll(['1.9.4', '1.9.5']));
+      expect(t['1.9.4'], isNotEmpty);
+    });
+  });
 }

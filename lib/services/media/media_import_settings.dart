@@ -20,6 +20,7 @@ class MediaImportSettings {
   static const _kGpuUnavailable = 'media_gpu_unavailable_versions';
   static const _kWhisperBuild = 'media_tool_whisper_build';
   static const _kGpuDetectCache = 'media_gpu_detect_cache';
+  static const _kMetalOk = 'media_metal_ok_versions';
 
   /// 工具验证缓存（kind -> JSON 条目），避免每次检测 spawn 慢二进制。
   Future<Map<String, String>> readVerifyCache() async {
@@ -196,5 +197,26 @@ class MediaImportSettings {
   Future<void> setGpuDetectCache(Map<String, dynamic> cache) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kGpuDetectCache, jsonEncode(cache));
+  }
+
+  /// Metal 实测可用缓存（版本 → 时间戳字符串）：命中后同版本不再重复探测。
+  /// 与黑名单表分离：黑名单语义是「禁 GPU」，OK 表是「已实测可用」。
+  Future<Map<String, String>> metalOkVersions() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kMetalOk);
+    if (raw == null) return {};
+    try {
+      return Map<String, String>.from(jsonDecode(raw) as Map);
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// 追加一条 Metal 可用记录（同键覆盖）。
+  Future<void> markMetalOk(String version) async {
+    final table = await metalOkVersions();
+    table[version] = DateTime.now().millisecondsSinceEpoch.toString();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kMetalOk, jsonEncode(table));
   }
 }

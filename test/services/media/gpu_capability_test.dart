@@ -1,5 +1,6 @@
 // test/services/media/gpu_capability_test.dart
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:open_note/services/media/gpu_capability.dart';
@@ -160,5 +161,18 @@ void main() {
       final cap = await detector.detect();
       expect(cap.kind, Platform.isMacOS ? GpuKind.metal : GpuKind.none);
     });
+  });
+
+  test('metalProbeWavBytes：标准 WAV 头 + 1 秒 16kHz 单声道 16bit', () {
+    final b = metalProbeWavBytes();
+    expect(b.length, 44 + 16000 * 2);
+    expect(String.fromCharCodes(b.sublist(0, 4)), 'RIFF');
+    expect(String.fromCharCodes(b.sublist(8, 12)), 'WAVE');
+    final bd = ByteData.sublistView(b);
+    expect(bd.getUint32(24, Endian.little), 16000, reason: '采样率');
+    expect(bd.getUint16(22, Endian.little), 1, reason: '单声道');
+    expect(bd.getUint16(34, Endian.little), 16, reason: '16-bit');
+    expect(bd.getUint32(40, Endian.little), 32000, reason: 'data 长度');
+    expect(bd.getUint16(20, Endian.little), 1, reason: 'PCM 格式');
   });
 }
