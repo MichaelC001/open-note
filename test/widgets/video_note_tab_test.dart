@@ -153,6 +153,13 @@ class _SpyGpuProvider extends MediaImportProvider {
     return super.ensureWhisperMetalProbe();
   }
 
+  // checkEnvironment 完成点触发的探测（fake 工具无 path 空转）会复位该标志，
+  // 须在 pump 稳定后注入「探测中」状态再刷新
+  void setMetalProbeRunningForTest() {
+    metalProbeRunning = true;
+    notifyListeners();
+  }
+
   // checkEnvironment 完成后的真实重算（refreshWhisperMetalState）会按
   // 设置表清空手工置入的黑名单缓存，故在 pump 稳定后经此注入命中值，
   // 等价真实「命中→notify」链路
@@ -607,8 +614,10 @@ void main() {
       final provider = makeSpyProvider(
           gpuDetector:
               _FakeGpuDetector(const GpuCapability(kind: GpuKind.metal)));
-      provider.metalProbeRunning = true;
       await pumpTab(tester, provider);
+
+      provider.setMetalProbeRunningForTest();
+      await tester.pump();
 
       final tile = tester.widget<SwitchListTile>(find.ancestor(
           of: find.text('GPU 加速'), matching: find.byType(SwitchListTile)));
@@ -619,7 +628,7 @@ void main() {
     }
   });
 
-  testWidgets('Mac：initState 触发一次 Metal 探测；开关从开到关不追加',
+  testWidgets('Mac：进入 tab 由环境检查触发一次 Metal 探测；开关从开到关不追加',
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     try {
@@ -628,7 +637,7 @@ void main() {
               _FakeGpuDetector(const GpuCapability(kind: GpuKind.metal)));
       await pumpTab(tester, provider);
 
-      expect(provider.probeCalls, 1, reason: 'initState 触发一次');
+      expect(provider.probeCalls, 1, reason: '环境检查完成点触发一次');
       await tester.tap(find.text('GPU 加速')); // 默认开 → 点击为关操作
       await tester.pump();
 

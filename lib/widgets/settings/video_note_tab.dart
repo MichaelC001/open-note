@@ -55,10 +55,6 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
       final busyNow = p.operationInProgress;
       if (!busyNow) p.checkEnvironment();
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      context.read<MediaImportProvider>().ensureWhisperMetalProbe();
-    });
   }
 
   Future<void> _load() async {

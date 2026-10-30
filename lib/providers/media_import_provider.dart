@@ -74,6 +74,8 @@ class MediaImportProvider extends ChangeNotifier {
         clock = clock ?? DateTime.now {
     // fire-and-forget：从持久化恢复「可更新」徽标（跨重启不丢，见 checkToolUpdates）
     unawaited(_restoreUpdateAvailable());
+    // 构造时恢复 Mac Metal 黑名单命中缓存（toolStatuses 就绪后的刷新兜底）
+    unawaited(refreshWhisperMetalState());
   }
 
   /// 默认工具服务：接 SharedPreferences 验证缓存（yt-dlp 等 spawn 慢的二进制免重复验证）。
@@ -280,6 +282,9 @@ class MediaImportProvider extends ChangeNotifier {
       _busy = false;
       _notify();
       unawaited(refreshWhisperMetalState());
+      // 环境检查完成点触发 Metal 实测（守卫幂等）：进入媒体设置的探测定点，
+      // 同时覆盖装完/升级 whisper 后当次会话的探测（此前仅开关关→开触发）
+      unawaited(ensureWhisperMetalProbe());
     }
   }
 

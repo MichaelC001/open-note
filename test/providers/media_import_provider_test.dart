@@ -177,6 +177,21 @@ exit 1
   return script;
 }
 
+/// 排空 checkEnvironment 完成点自动触发的探测（触发为 unawaited，
+/// 同步置位 metalProbeRunning，须等其收尾后再断言/清理）。
+Future<void> drainMetalProbe(MediaImportProvider p) async {
+  while (p.metalProbeRunning) {
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
+}
+
+/// 手术式清除探测落盘缓存（黑名单/OK 表），保留开关等其余预置键。
+Future<void> clearMetalProbeCaches() async {
+  final sp = await SharedPreferences.getInstance();
+  await sp.remove('media_gpu_unavailable_versions');
+  await sp.remove('media_metal_ok_versions');
+}
+
 /// path_provider mock 到指定目录（confirmAndStart/probe 真实执行 service.run 时用）。
 void mockPathProviderTo(Directory dir) {
   const channel = MethodChannel('plugins.flutter.io/path_provider');
@@ -1437,6 +1452,11 @@ void main() {
         modelService: _AllModelsService(() async => tmp.path),
       );
       await p.startForFile(makeWavSource());
+      // 完成点自动探测会真实跑脚本并写黑名单/日志：排空并清场，
+      // 保证 confirmAndStart 场景从干净状态开始（开关预置不受影响）
+      await drainMetalProbe(p);
+      await clearMetalProbeCaches();
+      if (log.existsSync()) log.deleteSync();
       return (p, log);
     }
 
@@ -1529,8 +1549,25 @@ void main() {
       );
       // 填充 toolStatuses（探测守卫读取 whisperCli 状态，与真实启动路径一致）
       await p.checkEnvironment();
+      // 完成点自动触发探测（unawaited）：排空后交还用例断言/清理
+      await drainMetalProbe(p);
       return (p, log);
     }
+
+    test('checkEnvironment 完成点自动触发 Metal 探测（环境检查→探测集成）',
+        skip: !Platform.isMacOS ? '依赖 sh 脚本假进程' : null,
+        () async {
+      final logPath = '${tmp.path}/probe-invocations.log';
+      final cli = await _writeFakeWhisperCliOk(tmp, logPath);
+      // makeProbeProvider 仅 await checkEnvironment（含排空），未显式调探测
+      final (p, log) = await makeProbeProvider(cli: cli);
+
+      expect(log.readAsStringSync().trim().split('\n'), ['run'],
+          reason: '环境检查完成点应自动执行探测');
+      expect((await MediaImportSettings().metalOkVersions()).keys,
+          contains('1.9.5'), reason: '自动探测走完整链路并写 OK 缓存');
+      expect(p.metalProbeRunning, isFalse);
+    });
 
     test('Metal 崩溃→CPU 重试成功：写黑名单 mac:版本，不写 OK', 
         skip: !Platform.isMacOS ? '依赖 sh 脚本假进程' : null,
@@ -1655,6 +1692,10 @@ void main() {
       final logPath = '${tmp.path}/probe-invocations.log';
       final cli = await _writeFakeWhisperCliOk(tmp, logPath);
       final (p, log) = await makeProbeProvider(cli: cli);
+
+      // setup 期自动探测已写 OK 缓存与日志：清场后再验证并发只执行一次
+      await clearMetalProbeCaches();
+      if (log.existsSync()) log.deleteSync();
 
       final f1 = p.ensureWhisperMetalProbe();
       final f2 = p.ensureWhisperMetalProbe();
