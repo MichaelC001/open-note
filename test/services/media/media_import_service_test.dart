@@ -120,6 +120,58 @@ C:/Users/x/a.mp4: Invalid data found when processing input''');
         '我的视频 [abc]');
   });
 
+  group('resolveDownloadedFile 下载结果确认', () {
+    test('打印路径存在：直接信任返回', () async {
+      final dir = Directory.systemTemp.createTempSync('vtn_rdl');
+      try {
+        final f = File('${dir.path}/视频 [id1].m4a');
+        f.writeAsBytesSync([1, 2, 3]);
+        final r = await MediaImportService.resolveDownloadedFile(f.path, dir);
+        expect(r!.path, f.path);
+      } finally {
+        dir.deleteSync(recursive: true);
+      }
+    });
+
+    test('打印路径乱码不存在：目录兜底取最大媒体文件', () async {
+      final dir = Directory.systemTemp.createTempSync('vtn_rdl');
+      try {
+        File('${dir.path}/\uFFFD\uFFFD\uFFFD [BV1].m4a').writeAsBytesSync([1]);
+        final big = File('${dir.path}/真名 [BV2].mp4');
+        big.writeAsBytesSync(List<int>.filled(500, 0));
+        File('${dir.path}/audio.wav').writeAsBytesSync(List<int>.filled(999, 0));
+        final r = await MediaImportService.resolveDownloadedFile(
+            '${dir.path}/\uFFFD [BV1].m4a', dir);
+        expect(r!.path, big.path);
+      } finally {
+        dir.deleteSync(recursive: true);
+      }
+    });
+
+    test('目录无媒体文件：返回 null', () async {
+      final dir = Directory.systemTemp.createTempSync('vtn_rdl');
+      try {
+        final r = await MediaImportService.resolveDownloadedFile(
+            '${dir.path}/不存在.m4a', dir);
+        expect(r, isNull);
+      } finally {
+        dir.deleteSync(recursive: true);
+      }
+    });
+
+    test('audio.wav 不参与兜底（应用自身产物）', () async {
+      final dir = Directory.systemTemp.createTempSync('vtn_rdl');
+      try {
+        File('${dir.path}/audio.wav').writeAsBytesSync([1]);
+        final r = await MediaImportService.resolveDownloadedFile(
+            '${dir.path}/不存在.m4a', dir);
+        expect(r, isNull);
+      } finally {
+        dir.deleteSync(recursive: true);
+      }
+    });
+  });
+
   group('ytDlpArgs', () {
     test('不含 ffmpegPath：不追加 --ffmpeg-location，url 收尾', () {
       final args = MediaImportService.ytDlpArgs(url: 'https://youtu.be/abc');

@@ -271,6 +271,34 @@ class MediaImportService {
         url,
       ];
 
+  /// 媒体文件扩展名（yt-dlp ba/b 常见输出）。
+  static const _mediaExts = {
+    'mp4', 'm4a', 'm4v', 'webm', 'mkv', 'opus', 'ogg', 'oga', 'mp3', 'wav',
+    'flv', 'aac', 'ts', 'mov', '3gp',
+  };
+
+  /// 下载结果确认：优先信任 yt-dlp `--print` 的路径（存在即用）；否则按媒体
+  /// 扩展名在工作目录兜底（取最大文件）。打印路径在中文 Windows 下可能因
+  /// yt-dlp 输出编码与解码不一致而乱码（U+FFFD），文件本体由 yt-dlp 以
+  /// Unicode 名写入不受影响。audio.wav 是应用自身产物，不参与兜底。
+  static Future<File?> resolveDownloadedFile(
+      String printedPath, Directory workDir) async {
+    final printed = File(printedPath);
+    if (await printed.exists()) return printed;
+    File? best;
+    await for (final e in workDir.list(followLinks: false)) {
+      if (e is! File) continue;
+      final name = e.uri.pathSegments.last;
+      if (name == 'audio.wav') continue;
+      final dot = name.lastIndexOf('.');
+      if (dot < 0) continue;
+      if (!_mediaExts.contains(name.substring(dot + 1).toLowerCase())) continue;
+      final len = await e.length();
+      if (best == null || len > await best.length()) best = e;
+    }
+    return best;
+  }
+
   Future<File> _acquire(
     MediaImportRequest req,
     Directory workDir,
@@ -323,7 +351,17 @@ class MediaImportService {
     if (code != 0 || lastPlainLine == null) {
       throw MediaImportException('URL 媒体下载失败，站点可能不支持或网络异常', _tail(sbErr));
     }
-    return File(lastPlainLine!);
+    final resolved = await resolveDownloadedFile(lastPlainLine!, workDir);
+    if (resolved != null) {
+      if (resolved.path != lastPlainLine) {
+        debugPrint('[MediaImport] 打印路径不存在（疑似输出编码乱码），'
+            '目录兜底: ${resolved.path}');
+      }
+      return resolved;
+    }
+    throw MediaImportException(
+        'URL 媒体下载完成但未找到文件（yt-dlp 报告路径：$lastPlainLine）',
+        _tail(sbErr));
   }
 
   Future<File> _toWav(
