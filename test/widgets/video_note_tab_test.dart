@@ -10,9 +10,12 @@ import 'package:open_note/l10n/strings.g.dart';
 import 'package:open_note/providers/language_provider.dart';
 import 'package:open_note/providers/media_import_provider.dart';
 import 'package:open_note/providers/update_provider.dart';
+import 'package:flutter/foundation.dart';
+import 'package:open_note/services/media/gpu_capability.dart';
 import 'package:open_note/services/media/media_downloader.dart';
 import 'package:open_note/services/media/media_import_settings.dart';
 import 'package:open_note/services/media/media_tool_service.dart';
+import 'package:open_note/services/media/process_runner.dart';
 import 'package:open_note/services/media/transcript_formatter.dart';
 import 'package:open_note/services/media/tool_update_service.dart';
 import 'package:open_note/services/media/whisper_model_service.dart';
@@ -109,6 +112,40 @@ class _CapturingDownloader extends MediaDownloader {
   }
 }
 
+/// 固定能力结论的假探测器：UI 测试与宿主机真探测解耦。
+class _FakeGpuDetector extends GpuCapabilityDetector {
+  final GpuCapability cap;
+
+  _FakeGpuDetector(this.cap)
+      : super(
+          readCache: () async => null,
+          writeCache: (_) async {},
+          runProbe: (_, _) async => ProcessRunResult(1, '', ''),
+        );
+
+  @override
+  Future<GpuCapability> detect({bool force = false}) async => cap;
+}
+
+/// 记录 setWhisperGpuEnabled 调用的 spy provider（不触发真实重装联动）。
+class _SpyGpuProvider extends MediaImportProvider {
+  int gpuToggleCalls = 0;
+  bool? lastGpuToggleValue;
+
+  _SpyGpuProvider({
+    required super.toolService,
+    required super.modelService,
+    super.gpuDetector,
+  });
+
+  @override
+  Future<void> setWhisperGpuEnabled(bool v) async {
+    gpuToggleCalls++;
+    lastGpuToggleValue = v;
+    await settings.setWhisperGpu(v);
+  }
+}
+
 void main() {
   late Directory tmpTools;
   late Directory tmpModels;
@@ -132,6 +169,7 @@ void main() {
     bool toolsReady = false,
     ToolUpdateService? updateService,
     MediaDownloader? downloader,
+    GpuCapabilityDetector? gpuDetector,
   }) {
     toolsFake = _CountingToolService(tmpTools, allReady: toolsReady);
     modelsFake = toolsReady
@@ -142,6 +180,17 @@ void main() {
       modelService: modelsFake,
       updateService: updateService,
       downloader: downloader,
+      gpuDetector: gpuDetector,
+    );
+  }
+
+  _SpyGpuProvider makeSpyProvider({GpuCapabilityDetector? gpuDetector}) {
+    toolsFake = _CountingToolService(tmpTools, allReady: true);
+    modelsFake = _AllDownloadedFastService(tmpModels);
+    return _SpyGpuProvider(
+      toolService: toolsFake,
+      modelService: modelsFake,
+      gpuDetector: gpuDetector,
     );
   }
 
@@ -403,7 +452,8 @@ void main() {
   });
 
   testWidgets('关键时间戳开关与内容优化强度滑块渲染、默认值与持久化', (tester) async {
-    tester.view.physicalSize = const Size(1280, 1000);
+    // GPU 开关行加入引擎卡片后整体下移，1000 视口令滑块落出不可拖
+    tester.view.physicalSize = const Size(1280, 1100);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -474,12 +524,92 @@ void main() {
     expect(fakeDl.lastUrl, contains('/ffmpeg-static/releases/'));
   });
 
+  testWidgets('Windows 无 N 卡 → GPU 开关禁灰且副标题提示未检测到',
+      (tester) async {
+    // 基线不变量在 tearDown 前校验，平台覆写须在测试体内复位
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    try {
+      final provider = makeProvider(
+        toolsReady: true,
+        gpuDetector:
+            _FakeGpuDetector(const GpuCapability(kind: GpuKind.none)),
+      );
+      await pumpTab(tester, provider);
+
+      final tile = tester.widget<SwitchListTile>(find.ancestor(
+          of: find.text('GPU 加速'), matching: find.byType(SwitchListTile)));
+      expect(tile.onChanged, isNull, reason: '无 CUDA 能力应禁灰');
+      expect(find.text('未检测到 NVIDIA GPU'), findsOneWidget);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('Windows 有 N 卡 → CUDA 副标题且开关可用', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    try {
+      final provider = makeProvider(
+        toolsReady: true,
+        gpuDetector: _FakeGpuDetector(const GpuCapability(kind: GpuKind.cuda)),
+      );
+      await pumpTab(tester, provider);
+
+      final tile = tester.widget<SwitchListTile>(find.ancestor(
+          of: find.text('GPU 加速'), matching: find.byType(SwitchListTile)));
+      expect(tile.onChanged, isNotNull);
+      expect(find.text('使用 NVIDIA CUDA 加速语音识别'), findsOneWidget);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('支持时 toggle → provider.setWhisperGpuEnabled 联动',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    try {
+      final provider = makeSpyProvider(
+        gpuDetector:
+            _FakeGpuDetector(const GpuCapability(kind: GpuKind.metal)),
+      );
+      await pumpTab(tester, provider);
+
+      expect(find.text('使用 Metal GPU 加速语音识别'), findsOneWidget);
+      await tester.tap(find.text('GPU 加速'));
+      await tester.pumpAndSettle();
+
+      expect(provider.gpuToggleCalls, 1);
+      expect(provider.lastGpuToggleValue, isFalse, reason: '默认开 → 点击后关');
+      expect(await MediaImportSettings().whisperGpu(), isFalse);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('Linux 不渲染 GPU 加速行', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    try {
+      final provider = makeProvider(
+        toolsReady: true,
+        gpuDetector:
+            _FakeGpuDetector(const GpuCapability(kind: GpuKind.none)),
+      );
+      await pumpTab(tester, provider);
+
+      expect(find.text('GPU 加速'), findsNothing);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
   testWidgets('暗色模式两个开关拨杆白色可见（thumbColor 生效）', (tester) async {
     tester.view.physicalSize = const Size(1280, 1000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    final provider = makeProvider(toolsReady: true);
+    final provider = makeProvider(
+      toolsReady: true,
+      gpuDetector: _FakeGpuDetector(const GpuCapability(kind: GpuKind.metal)),
+    );
     await tester.pumpWidget(
       TranslationProvider(
         child: ChangeNotifierProvider<MediaImportProvider>.value(
@@ -493,10 +623,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 范围仅删除源/关键时间戳两个开关
+    // 范围为删除源/关键时间戳/GPU 加速三个开关
     final switches =
         tester.widgetList<SwitchListTile>(find.byType(SwitchListTile)).toList();
-    expect(switches.length, 2);
+    expect(switches.length, 3);
     for (final s in switches) {
       expect(s.thumbColor?.resolve(const <WidgetState>{}), Colors.white);
       // 既有 activeThumbColor 保留

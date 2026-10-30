@@ -1392,7 +1392,8 @@ void main() {
     }
 
     test('Metal 崩溃→CPU 重试成功：写 mac:版本 黑名单（版本升级后自动重试 GPU）',
-        skip: Platform.isWindows ? '依赖 sh 脚本假进程' : null, () async {
+        skip: !Platform.isMacOS ? '依赖宿主 detect()==metal 与 sh 脚本假进程' : null,
+        () async {
       final (p, log) = await makeScriptProvider();
 
       await p.confirmAndStart(saveNote: (r) async => 'note-1');
@@ -1410,7 +1411,8 @@ void main() {
     });
 
     test('GPU 开关关闭：决策禁 GPU 首启带 -ng 直达成功，不写黑名单',
-        skip: Platform.isWindows ? '依赖 sh 脚本假进程' : null, () async {
+        skip: !Platform.isMacOS ? '依赖宿主 detect()==metal 与 sh 脚本假进程' : null,
+        () async {
       SharedPreferences.setMockInitialValues(
           <String, Object>{'media_whisper_gpu': false});
       final (p, log) = await makeScriptProvider();

@@ -137,6 +137,10 @@ class MediaImportProvider extends ChangeNotifier {
         now: clock,
       );
 
+  /// GPU 能力探测器只读访问：设置页 Tab 复用同一条缓存/节流链路
+  /// （测试可经构造参数 gpuDetector 注入 fake）。
+  GpuCapabilityDetector get gpuCapability => _gpuDetector;
+
   bool get _isWinFlow => isWindowsOverride ?? Platform.isWindows;
 
   static Future<ProcessRunResult> _defaultGpuProbe(

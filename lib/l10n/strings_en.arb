@@ -2422,6 +2422,10 @@
       "Open the link in your browser to download the model file (use the mirror if direct access is slow)",
   "media_model_guide_stepPlace":
       "Place it in the folder below keeping the file name, then tap Refresh to detect it automatically",
+  "media_settings_gpuAccelerate": "GPU Acceleration",
+  "media_settings_gpuSubtitleCuda": "Accelerate speech recognition with NVIDIA CUDA",
+  "media_settings_gpuSubtitleNoCuda": "No NVIDIA GPU detected",
+  "media_settings_gpuSubtitleMetal": "Accelerate speech recognition with Metal",
   "media_env_background":
       "Download continues in the background. Check Settings → Video to Note for progress.",
   "media_env_uninstall": "Uninstall",

@@ -1851,6 +1851,10 @@ class TranslationsEn extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get media_model_guide_title => 'Manual Model Download Guide';
 	@override String get media_model_guide_stepDownload => 'Open the link in your browser to download the model file (use the mirror if direct access is slow)';
 	@override String get media_model_guide_stepPlace => 'Place it in the folder below keeping the file name, then tap Refresh to detect it automatically';
+	@override String get media_settings_gpuAccelerate => 'GPU Acceleration';
+	@override String get media_settings_gpuSubtitleCuda => 'Accelerate speech recognition with NVIDIA CUDA';
+	@override String get media_settings_gpuSubtitleNoCuda => 'No NVIDIA GPU detected';
+	@override String get media_settings_gpuSubtitleMetal => 'Accelerate speech recognition with Metal';
 	@override String get media_env_background => 'Download continues in the background. Check Settings → Video to Note for progress.';
 	@override String get media_env_uninstall => 'Uninstall';
 	@override String get media_env_finishing => 'Downloaded · Installing…';

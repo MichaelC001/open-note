@@ -1845,6 +1845,10 @@ class TranslationsZhTw extends Translations with BaseTranslations<AppLocale, Tra
 	@override String get media_model_guide_title => '識別模型手動下載指引';
 	@override String get media_model_guide_stepDownload => '瀏覽器開啟連結下載對應模型檔案（直連不暢時用鏡像）';
 	@override String get media_model_guide_stepPlace => '放入下方目錄並保持檔名不變，點「重新偵測」自動識別';
+	@override String get media_settings_gpuAccelerate => 'GPU 加速';
+	@override String get media_settings_gpuSubtitleCuda => '使用 NVIDIA CUDA 加速語音識別';
+	@override String get media_settings_gpuSubtitleNoCuda => '未偵測到 NVIDIA GPU';
+	@override String get media_settings_gpuSubtitleMetal => '使用 Metal GPU 加速語音識別';
 	@override String get media_env_background => '下載已在背景進行，可在 設定→影片轉筆記 查看進度';
 	@override String get media_env_uninstall => '解除安裝';
 	@override String get media_env_finishing => '下載完成 · 安裝中…';

@@ -1845,6 +1845,10 @@ class TranslationsRu extends Translations with BaseTranslations<AppLocale, Trans
 	@override String get media_model_guide_title => 'Ручная загрузка модели';
 	@override String get media_model_guide_stepDownload => 'Откройте ссылку в браузере и скачайте файл модели (при медленном соединении используйте зеркало)';
 	@override String get media_model_guide_stepPlace => 'Поместите файл в папку ниже, сохранив имя, затем нажмите «Обновить» для обнаружения';
+	@override String get media_settings_gpuAccelerate => 'Ускорение GPU';
+	@override String get media_settings_gpuSubtitleCuda => 'Ускорение распознавания речи через NVIDIA CUDA';
+	@override String get media_settings_gpuSubtitleNoCuda => 'Видеокарта NVIDIA не обнаружена';
+	@override String get media_settings_gpuSubtitleMetal => 'Ускорение распознавания речи через Metal';
 	@override String get media_env_background => 'Загрузка продолжается в фоне: Настройки → Видео в заметку.';
 	@override String get media_env_uninstall => 'Удалить';
 	@override String get media_env_finishing => 'Скачано · Установка…';

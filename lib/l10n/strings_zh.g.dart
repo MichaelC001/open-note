@@ -3156,6 +3156,18 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 	/// zh: '放入下方目录并保持文件名不变，点「重新检测」自动识别'
 	String get media_model_guide_stepPlace => '放入下方目录并保持文件名不变，点「重新检测」自动识别';
 
+	/// zh: 'GPU 加速'
+	String get media_settings_gpuAccelerate => 'GPU 加速';
+
+	/// zh: '使用 NVIDIA CUDA 加速语音识别'
+	String get media_settings_gpuSubtitleCuda => '使用 NVIDIA CUDA 加速语音识别';
+
+	/// zh: '未检测到 NVIDIA GPU'
+	String get media_settings_gpuSubtitleNoCuda => '未检测到 NVIDIA GPU';
+
+	/// zh: '使用 Metal GPU 加速语音识别'
+	String get media_settings_gpuSubtitleMetal => '使用 Metal GPU 加速语音识别';
+
 	/// zh: '下载已在后台进行，可在 设置→视频转笔记 查看进度'
 	String get media_env_background => '下载已在后台进行，可在 设置→视频转笔记 查看进度';
 

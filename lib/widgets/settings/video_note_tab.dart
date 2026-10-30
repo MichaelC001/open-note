@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../l10n/strings.g.dart';
 import '../../providers/media_import_provider.dart';
+import '../../services/media/gpu_capability.dart';
 import '../../services/media/media_downloader.dart';
 import '../../services/media/media_import_settings.dart';
 import '../../services/media/media_tool_service.dart';
@@ -31,6 +32,10 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
   bool _deleteSource = true;
   bool _includeTimestamps = false;
   ContentPolishLevel _polish = ContentPolishLevel.structured;
+  // GPU 加速开关：设置值与能力探测结论分开异步加载（探测含 24h 节流缓存）
+  bool _whisperGpu = true;
+  GpuKind? _gpuKind;
+  late final GpuCapabilityDetector _gpuCapability;
   bool _loaded = false;
   late final Future<String> _modelsDirFuture =
       widget.modelService.modelsDir();
@@ -42,6 +47,7 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
   @override
   void initState() {
     super.initState();
+    _gpuCapability = context.read<MediaImportProvider>().gpuCapability;
     _load();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -56,8 +62,17 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
     _deleteSource = await _settings.deleteSourceAfter();
     _includeTimestamps = await _settings.includeTimestamps();
     _polish = await _settings.polishLevel();
+    _whisperGpu = await _settings.whisperGpu();
     _loaded = true;
     if (mounted) setState(() {});
+    // 能力探测独立加载（不卡 UI）；结论 null 前不渲染开关行。
+    // 失败按无能力处理：Windows 禁灰、Linux 不渲染，可用性无损
+    try {
+      final kind = (await _gpuCapability.detect()).kind;
+      if (mounted) setState(() => _gpuKind = kind);
+    } catch (_) {
+      if (mounted) setState(() => _gpuKind = GpuKind.none);
+    }
   }
 
   @override
@@ -104,6 +119,8 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
             const SizedBox(height: 4),
             for (final kind in MediaToolKind.values)
               _toolRow(context, p, t, platformKey, kind),
+            if (_gpuKind != null && platformKey != 'linux')
+              _gpuSwitchTile(p, t, platformKey),
             const Divider(height: 24),
             ModelList(
               onDelete: (tier) => _confirmDeleteModel(context, p, tier),
@@ -317,6 +334,40 @@ class _VideoNoteTabState extends State<VideoNoteTab> {
       onDownload: () => p.downloadTool(kind),
       onUninstall:
           canUninstall ? () => _confirmUninstall(context, p, kind) : null,
+    );
+  }
+
+  /// GPU 加速开关行（引擎区尾部）：平台无支持时整体不渲染（linux）或
+  /// 禁灰（Windows 无 N 卡），副标题按平台/能力取文案。
+  Widget _gpuSwitchTile(
+      MediaImportProvider p, Translations t, String platformKey) {
+    final kind = _gpuKind!;
+    final supported = switch (platformKey) {
+      'windows' => kind == GpuKind.cuda,
+      'macos' => true,
+      _ => false,
+    };
+    final subtitle = switch (platformKey) {
+      'windows' =>
+        supported
+            ? t.media_settings_gpuSubtitleCuda
+            : t.media_settings_gpuSubtitleNoCuda,
+      _ => t.media_settings_gpuSubtitleMetal,
+    };
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      title: Text(t.media_settings_gpuAccelerate),
+      subtitle: Text(subtitle),
+      value: _whisperGpu,
+      activeThumbColor: DesignTokens.primary500,
+      thumbColor: const WidgetStatePropertyAll(Colors.white),
+      onChanged: !supported
+          ? null
+          : (v) {
+              setState(() => _whisperGpu = v);
+              p.setWhisperGpuEnabled(v);
+            },
     );
   }
 
