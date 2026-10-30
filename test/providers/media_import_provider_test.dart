@@ -1619,59 +1619,68 @@ void main() {
           contains('mac:1.9.5'));
     });
 
-    test('守卫：开关关 / 无模型 / 已黑名单 / 已 OK / 非 Mac / 操作中 → 不执行', 
+    test('守卫：开关关 / 无模型 / 已黑名单 / 已 OK / 非 Mac / 操作中 → 不执行',
         skip: !Platform.isMacOS ? '依赖 sh 脚本假进程' : null,
         () async {
+      // 断言必须指向脚本实际落笔的日志（此前误指 probe-invocations.log，
+      // 脚本从不写它，六个「不探测」断言恒真空转）
+      final guardLog = File('${tmp.path}/guard.log');
+
       Future<(MediaImportProvider, File)> make(String? presetKey,
           [Object? presetValue]) async {
         final initial = <String, Object>{
           ?presetKey: presetValue ?? 'x',
         };
         SharedPreferences.setMockInitialValues(initial);
-        final logPath = '${tmp.path}/guard.log';
-        final cli = await _writeFakeWhisperCliOk(tmp, logPath);
+        final cli =
+            await _writeFakeWhisperCliOk(tmp, guardLog.path);
         return makeProbeProvider(cli: cli);
       }
 
       // 开关关
-      var (p, log) = await make('media_whisper_gpu', false);
+      var (p, _) = await make('media_whisper_gpu', false);
       await p.ensureWhisperMetalProbe();
-      expect(log.existsSync(), isFalse, reason: '开关关不探测');
-      await Future<void>.delayed(const Duration(milliseconds: 30));
-      if (log.existsSync()) log.deleteSync();
+      expect(guardLog.existsSync(), isFalse, reason: '开关关不探测');
+      if (guardLog.existsSync()) guardLog.deleteSync();
 
-      // 无模型
-      (p, log) = await make(null);
+      // 无模型（make(null) 无预置 → setup 期自动探测会跑满并写 OK 与
+      // guard.log：先清场；noModel 补做环境检查填充 toolStatuses，
+      // 显式探测才真正走到「无模型」守卫）
+      (p, _) = await make(null);
+      await clearMetalProbeCaches();
+      if (guardLog.existsSync()) guardLog.deleteSync();
       final noModel = MediaImportProvider(
         toolService: _WhisperScriptToolService(
             '${tmp.path}/whisper-cli-ok.sh', () async => tmp.path),
         modelService: _NoModelsService(() async => tmp.path),
         isMacOverride: true,
       );
+      await noModel.checkEnvironment();
+      await drainMetalProbe(noModel);
       await noModel.ensureWhisperMetalProbe();
-      expect(log.existsSync(), isFalse, reason: '无模型不探测');
-      if (log.existsSync()) log.deleteSync();
+      expect(guardLog.existsSync(), isFalse, reason: '无模型不探测');
+      if (guardLog.existsSync()) guardLog.deleteSync();
 
       // 已黑名单
-      (p, log) = await make('media_gpu_unavailable_versions',
+      (p, _) = await make('media_gpu_unavailable_versions',
           '{"mac:1.9.5":"Metal 崩溃"}');
       await p.ensureWhisperMetalProbe();
-      expect(log.existsSync(), isFalse, reason: '黑名单命中不探测');
-      if (log.existsSync()) log.deleteSync();
+      expect(guardLog.existsSync(), isFalse, reason: '黑名单命中不探测');
+      if (guardLog.existsSync()) guardLog.deleteSync();
 
       // 已 OK
-      (p, log) = await make('media_metal_ok_versions', '{"1.9.5":"1700000000"}');
+      (p, _) =
+          await make('media_metal_ok_versions', '{"1.9.5":"1700000000"}');
       await p.ensureWhisperMetalProbe();
-      expect(log.existsSync(), isFalse, reason: 'OK 缓存命中不探测');
-      if (log.existsSync()) log.deleteSync();
+      expect(guardLog.existsSync(), isFalse, reason: 'OK 缓存命中不探测');
+      if (guardLog.existsSync()) guardLog.deleteSync();
 
       // 非 Mac
-      final logPath = '${tmp.path}/guard.log';
-      final cli = await _writeFakeWhisperCliOk(tmp, logPath);
-      (p, log) = await makeProbeProvider(cli: cli, isMacOverride: false);
+      final cli = await _writeFakeWhisperCliOk(tmp, guardLog.path);
+      (p, _) = await makeProbeProvider(cli: cli, isMacOverride: false);
       await p.ensureWhisperMetalProbe();
-      expect(log.existsSync(), isFalse, reason: '非 Mac 不探测');
-      if (log.existsSync()) log.deleteSync();
+      expect(guardLog.existsSync(), isFalse, reason: '非 Mac 不探测');
+      if (guardLog.existsSync()) guardLog.deleteSync();
 
       // 操作进行中
       final busyLogPath = '${tmp.path}/busy.log';
