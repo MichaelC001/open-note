@@ -47,6 +47,8 @@ class MediaImportProvider extends ChangeNotifier {
   final bool? isWindowsOverride;
   /// GPU 能力探测器覆写（测试注入；null 走 nvidia-smi/Mac 恒 metal 默认实现）。
   final GpuCapabilityDetector? gpuDetector;
+  /// Mac 平台守卫覆写（测试注入；null 走 Platform.isMacOS）。
+  final bool? isMacOverride;
 
   MediaImportProvider({
     MediaToolService? toolService,
@@ -61,6 +63,7 @@ class MediaImportProvider extends ChangeNotifier {
     this.whisperAssetResolver,
     this.isWindowsOverride,
     this.gpuDetector,
+    this.isMacOverride,
   }) : toolService = toolService ?? _defaultToolService(),
        modelService = modelService ?? WhisperModelService(),
        downloader = downloader ?? MediaDownloader(),
@@ -127,6 +130,12 @@ class MediaImportProvider extends ChangeNotifier {
   bool _busy = false;
   // CUDA 包安装后校验失败回退 CPU 的单次守卫（防递归重装）
   bool _whisperFallbackBusy = false;
+  /// Mac Metal 探测进行中（UI 置灰依据之一）。
+  bool metalProbeRunning = false;
+  /// 当前 whisper 版本的 Metal 不可用黑名单命中缓存（null=未命中）。
+  String? whisperMetalUnavailableVersion;
+  bool _metalProbeBusy = false;
+  Process? _metalProbeProcess;
 
   /// GPU 能力探测器：默认接 settings 检测缓存与 nvidia-smi 探测（24h 节流）。
   late final GpuCapabilityDetector _gpuDetector = gpuDetector ??
@@ -270,6 +279,7 @@ class MediaImportProvider extends ChangeNotifier {
     } finally {
       _busy = false;
       _notify();
+      unawaited(refreshWhisperMetalState());
     }
   }
 
@@ -376,6 +386,7 @@ class MediaImportProvider extends ChangeNotifier {
         !(toolStatuses[kind]?.ready ?? false)) {
       await _fallbackWhisperToCpuAfterFailedVerify();
     }
+    unawaited(refreshWhisperMetalState());
   }
 
   Future<String?> _downloadToolInternal(MediaToolKind kind) async {
@@ -654,6 +665,108 @@ class MediaImportProvider extends ChangeNotifier {
       );
     } catch (_) {
       // 黑名单写入失败不影响转录结果：下次会话重试路径依旧
+    }
+    unawaited(refreshWhisperMetalState());
+  }
+
+  /// 依据黑名单与当前 whisper 版本刷新 Mac Metal 不可用缓存；变化时 notify。
+  Future<void> refreshWhisperMetalState() async {
+    final version = toolStatuses[MediaToolKind.whisperCli]?.version;
+    String? hit;
+    if (version != null && version != 'ready') {
+      final keys = (await settings.gpuUnavailableVersions()).keys;
+      hit = keys.contains(gpuUnavailableKeyMac(version)) ? version : null;
+    }
+    if (whisperMetalUnavailableVersion != hit) {
+      whisperMetalUnavailableVersion = hit;
+      _notify();
+    }
+  }
+
+  /// Mac Metal 实测探测：守卫链全过时用 1 秒合成音频实际跑一次转录，
+  /// 以 onGpuFallback 是否触发判定（复用运行时崩溃特征识别，不另造匹配）。
+  /// 崩溃→写黑名单 mac:版本；成功→写 OK 缓存；其他异常/超时→乐观不动。
+  Future<void> ensureWhisperMetalProbe() async {
+    if (!(isMacOverride ?? Platform.isMacOS)) return;
+    if (operationInProgress || _metalProbeBusy) return;
+    _metalProbeBusy = true;
+    metalProbeRunning = true;
+    _notify();
+    Directory? tmpDir;
+    try {
+      final st = toolStatuses[MediaToolKind.whisperCli];
+      final version = st?.version;
+      if (st == null ||
+          !st.ready ||
+          st.path == null ||
+          version == null ||
+          version == 'ready') {
+        return;
+      }
+      if (!await settings.whisperGpu()) return;
+      if ((await settings.gpuUnavailableVersions())
+          .containsKey(gpuUnavailableKeyMac(version))) {
+        return;
+      }
+      if ((await settings.metalOkVersions()).containsKey(version)) return;
+      File? model;
+      for (final tier in WhisperModelTier.values) {
+        final f = await modelService.localModelFile(tier);
+        if (f != null) {
+          model = f;
+          break;
+        }
+      }
+      if (model == null) return;
+
+      tmpDir = await Directory.systemTemp.createTemp('metal_probe');
+      final wav = File('${tmpDir.path}/probe.wav');
+      await wav.writeAsBytes(metalProbeWavBytes(), flush: true);
+      var gpuFailed = false;
+      try {
+        await WhisperRunner()
+            .transcribe(
+          whisperCliPath: st.path!,
+          model: model,
+          wav: wav,
+          onStarted: (proc) => _metalProbeProcess = proc,
+          onGpuFallback: () => gpuFailed = true,
+        )
+            .timeout(const Duration(seconds: 60));
+        if (gpuFailed) {
+          await _markWhisperMetalUnavailable();
+        } else {
+          try {
+            await settings.markMetalOk(version);
+          } catch (_) {}
+        }
+      } on TimeoutException {
+        // 超时不定论：不写黑名单不写 OK
+      } catch (e) {
+        // onGpuFallback 仅在 CPU 重试成功时触发；重试也失败时异常带的是
+        // 重试 stderr——复用运行时崩溃特征识别（不另造匹配），
+        // Metal 确实坏则黑名单照写
+        if (gpuFailed ||
+            (e is WhisperException &&
+                WhisperRunner.looksLikeGpuFailure(0, e.stderr ?? ''))) {
+          await _markWhisperMetalUnavailable();
+        }
+        // 其余异常乐观不动（模型损坏等环境问题不应误置灰）
+      }
+    } catch (_) {
+      // 基础设施异常（临时目录创建失败等）：乐观不动
+    } finally {
+      try {
+        _metalProbeProcess?.kill();
+      } catch (_) {}
+      _metalProbeProcess = null;
+      try {
+        tmpDir?.delete(recursive: true);
+      } catch (_) {}
+      _metalProbeBusy = false;
+      metalProbeRunning = false;
+      await refreshWhisperMetalState();
+      _notify();
     }
   }
 

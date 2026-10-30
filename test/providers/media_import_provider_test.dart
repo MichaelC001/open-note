@@ -57,6 +57,21 @@ class _AllModelsService extends WhisperModelService {
   Future<File?> localModelFile(WhisperModelTier tier) async => File('m.bin');
 }
 
+class _NoModelsService extends WhisperModelService {
+  _NoModelsService(Future<String> Function() base)
+      : super(resolveBaseDir: base);
+  @override
+  Future<File?> localModelFile(WhisperModelTier tier) async => null;
+}
+
+/// operationInProgress 恒真（守卫「操作进行中跳过」用）。
+class _BusyProbeProvider extends MediaImportProvider {
+  _BusyProbeProvider(
+      {required super.toolService, required super.modelService});
+  @override
+  bool get operationInProgress => true;
+}
+
 class _SystemToolService extends _ReadyToolService {
   _SystemToolService(super.base);
   @override
@@ -128,6 +143,48 @@ exit 1
 ''');
   await Process.run('chmod', ['+x', script.path]);
   return script;
+}
+
+/// 变体：无论 -ng 与否都成功（模拟 Metal 正常版本）。
+Future<File> _writeFakeWhisperCliOk(Directory dir, String logPath) async {
+  final script = File('${dir.path}/whisper-cli-ok.sh');
+  await script.writeAsString('''
+#!/bin/sh
+prefix=""
+prev=""
+for a in "\$@"; do
+  [ "\$prev" = "-of" ] && prefix="\$a"
+  prev="\$a"
+done
+echo "run" >> '$logPath'
+echo '{"transcription":[{"offsets":{"from":0,"to":1000},"text":" hi"}],"result":{"language":"en"}}' > "\$prefix.json"
+exit 0
+''');
+  await Process.run('chmod', ['+x', script.path]);
+  return script;
+}
+
+/// 变体：Metal 崩且 CPU 重试也失败（无 -ng 与带 -ng 都退出 1）。
+Future<File> _writeFakeWhisperCliAlwaysFail(Directory dir, String logPath) async {
+  final script = File('${dir.path}/whisper-cli-fail.sh');
+  await script.writeAsString('''
+#!/bin/sh
+echo "invoked" >> '$logPath'
+echo "ggml_metal_init: error: cannot run the operation" >&2
+exit 1
+''');
+  await Process.run('chmod', ['+x', script.path]);
+  return script;
+}
+
+/// path_provider mock 到指定目录（confirmAndStart/probe 真实执行 service.run 时用）。
+void mockPathProviderTo(Directory dir) {
+  const channel = MethodChannel('plugins.flutter.io/path_provider');
+  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+      .setMockMethodCallHandler(channel, (call) async => dir.path);
+  addTearDown(() =>
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null));
 }
 
 void main() {
@@ -1365,20 +1422,12 @@ void main() {
   group('whisper 运行层 GPU 决策与 Metal 黑名单（假 cli 脚本集成）', () {
     // confirmAndStart 真实执行 service.run：resolveBaseDir 走 path_provider，
     // 测试环境 mock 到 tmp 目录
-    void mockPathProvider() {
-      const channel = MethodChannel('plugins.flutter.io/path_provider');
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, (call) async => tmp.path);
-      addTearDown(() =>
-          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-              .setMockMethodCallHandler(channel, null));
-    }
 
     File makeWavSource() => File('${tmp.path}/src.wav')
       ..writeAsBytesSync(List<int>.filled(44 + 32000, 0));
 
     Future<(MediaImportProvider, File)> makeScriptProvider() async {
-      mockPathProvider();
+      mockPathProviderTo(tmp);
       final whisperDir = Directory('${tmp.path}/tools/whisper')
         ..createSync(recursive: true);
       final log = File('${tmp.path}/invocations.log');
@@ -1459,6 +1508,160 @@ void main() {
       );
       expect(p.errorMessage, '转换失败');
       expect(p.errorDetail, isNot(contains('关闭 GPU 加速')));
+    });
+  });
+
+  group('Mac Metal 实测探测（假 cli 脚本集成）', () {
+    Future<(MediaImportProvider, File)> makeProbeProvider({
+      required File cli,
+      MediaToolService? toolService,
+      WhisperModelService? modelService,
+      bool? isMacOverride = true,
+    }) async {
+      mockPathProviderTo(tmp);
+      final log = File('${tmp.path}/probe-invocations.log');
+      final p = MediaImportProvider(
+        toolService: toolService ??
+            _WhisperScriptToolService(cli.path, () async => tmp.path),
+        modelService: modelService ??
+            _AllModelsService(() async => tmp.path),
+        isMacOverride: isMacOverride,
+      );
+      // 填充 toolStatuses（探测守卫读取 whisperCli 状态，与真实启动路径一致）
+      await p.checkEnvironment();
+      return (p, log);
+    }
+
+    test('Metal 崩溃→CPU 重试成功：写黑名单 mac:版本，不写 OK', 
+        skip: !Platform.isMacOS ? '依赖 sh 脚本假进程' : null,
+        () async {
+      final logPath = '${tmp.path}/probe-invocations.log';
+      final cli = await _writeFakeWhisperCli(tmp, logPath);
+      final (p, log) = await makeProbeProvider(cli: cli);
+
+      await p.ensureWhisperMetalProbe();
+
+      expect(log.readAsStringSync().trim().split('\n'), ['ng=0', 'ng=1'],
+          reason: '首启无 -ng 崩溃后带 -ng 重试');
+      expect(
+          (await MediaImportSettings().gpuUnavailableVersions()).keys,
+          contains('mac:1.9.5'));
+      expect(await MediaImportSettings().metalOkVersions(), isEmpty);
+      expect(p.whisperMetalUnavailableVersion, '1.9.5');
+      expect(p.metalProbeRunning, isFalse);
+    });
+
+    test('Metal 正常：写 OK 缓存，不写黑名单', 
+        skip: !Platform.isMacOS ? '依赖 sh 脚本假进程' : null,
+        () async {
+      final logPath = '${tmp.path}/probe-invocations.log';
+      final cli = await _writeFakeWhisperCliOk(tmp, logPath);
+      final (p, log) = await makeProbeProvider(cli: cli);
+
+      await p.ensureWhisperMetalProbe();
+
+      expect(log.readAsStringSync().trim().split('\n'), ['run']);
+      expect((await MediaImportSettings().metalOkVersions()).keys,
+          contains('1.9.5'));
+      expect(await MediaImportSettings().gpuUnavailableVersions(), isEmpty);
+      expect(p.whisperMetalUnavailableVersion, isNull);
+    });
+
+    test('Metal 崩且 CPU 重试也失败：仍写黑名单（Metal 确实坏）', 
+        skip: !Platform.isMacOS ? '依赖 sh 脚本假进程' : null,
+        () async {
+      final logPath = '${tmp.path}/probe-invocations.log';
+      final cli = await _writeFakeWhisperCliAlwaysFail(tmp, logPath);
+      final (p, log) = await makeProbeProvider(cli: cli);
+
+      await p.ensureWhisperMetalProbe();
+
+      expect(log.readAsStringSync().trim().split('\n'), ['invoked', 'invoked']);
+      expect(
+          (await MediaImportSettings().gpuUnavailableVersions()).keys,
+          contains('mac:1.9.5'));
+    });
+
+    test('守卫：开关关 / 无模型 / 已黑名单 / 已 OK / 非 Mac / 操作中 → 不执行', 
+        skip: !Platform.isMacOS ? '依赖 sh 脚本假进程' : null,
+        () async {
+      Future<(MediaImportProvider, File)> make(String? presetKey,
+          [Object? presetValue]) async {
+        final initial = <String, Object>{
+          ?presetKey: presetValue ?? 'x',
+        };
+        SharedPreferences.setMockInitialValues(initial);
+        final logPath = '${tmp.path}/guard.log';
+        final cli = await _writeFakeWhisperCliOk(tmp, logPath);
+        return makeProbeProvider(cli: cli);
+      }
+
+      // 开关关
+      var (p, log) = await make('media_whisper_gpu', false);
+      await p.ensureWhisperMetalProbe();
+      expect(log.existsSync(), isFalse, reason: '开关关不探测');
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      if (log.existsSync()) log.deleteSync();
+
+      // 无模型
+      (p, log) = await make(null);
+      final noModel = MediaImportProvider(
+        toolService: _WhisperScriptToolService(
+            '${tmp.path}/whisper-cli-ok.sh', () async => tmp.path),
+        modelService: _NoModelsService(() async => tmp.path),
+        isMacOverride: true,
+      );
+      await noModel.ensureWhisperMetalProbe();
+      expect(log.existsSync(), isFalse, reason: '无模型不探测');
+      if (log.existsSync()) log.deleteSync();
+
+      // 已黑名单
+      (p, log) = await make('media_gpu_unavailable_versions',
+          '{"mac:1.9.5":"Metal 崩溃"}');
+      await p.ensureWhisperMetalProbe();
+      expect(log.existsSync(), isFalse, reason: '黑名单命中不探测');
+      if (log.existsSync()) log.deleteSync();
+
+      // 已 OK
+      (p, log) = await make('media_metal_ok_versions', '{"1.9.5":"1700000000"}');
+      await p.ensureWhisperMetalProbe();
+      expect(log.existsSync(), isFalse, reason: 'OK 缓存命中不探测');
+      if (log.existsSync()) log.deleteSync();
+
+      // 非 Mac
+      final logPath = '${tmp.path}/guard.log';
+      final cli = await _writeFakeWhisperCliOk(tmp, logPath);
+      (p, log) = await makeProbeProvider(cli: cli, isMacOverride: false);
+      await p.ensureWhisperMetalProbe();
+      expect(log.existsSync(), isFalse, reason: '非 Mac 不探测');
+      if (log.existsSync()) log.deleteSync();
+
+      // 操作进行中
+      final busyLogPath = '${tmp.path}/busy.log';
+      final busyCli = await _writeFakeWhisperCliOk(tmp, busyLogPath);
+      final busy = _BusyProbeProvider(
+        toolService:
+            _WhisperScriptToolService(busyCli.path, () async => tmp.path),
+        modelService: _AllModelsService(() async => tmp.path),
+      );
+      await busy.ensureWhisperMetalProbe();
+      expect(File(busyLogPath).existsSync(), isFalse, reason: '操作中不探测');
+    });
+
+    test('并发重入：只执行一次', 
+        skip: !Platform.isMacOS ? '依赖 sh 脚本假进程' : null,
+        () async {
+      // 与 makeProbeProvider 返回的 log 同路径（脚本按 logPath 落笔）
+      final logPath = '${tmp.path}/probe-invocations.log';
+      final cli = await _writeFakeWhisperCliOk(tmp, logPath);
+      final (p, log) = await makeProbeProvider(cli: cli);
+
+      final f1 = p.ensureWhisperMetalProbe();
+      final f2 = p.ensureWhisperMetalProbe();
+      await Future.wait([f1, f2]);
+
+      expect(log.readAsStringSync().trim().split('\n'), ['run'],
+          reason: 'busy 防重入只跑一次');
     });
   });
 }
