@@ -88,6 +88,33 @@ void main() {
     expect(MediaImportService.parseFfmpegTimeSec('no data'), isNull);
   });
 
+  group('ffmpegErrorDetail 剥离启动横幅', () {
+    test('横幅三行被剥掉，真实错误保留', () {
+      final sb = StringBuffer('''
+ffmpeg version 6.1.1-essentials_build-www.gyan.dev Copyright (c) 2000-2023
+  built with gcc 12.2.0 (Rev10, Built by MSYS2 project)
+  configuration: --enable-gpl --enable-version3 --enable-static
+C:/Users/x/a.mp4: Invalid data found when processing input''');
+      final d = MediaImportService.ffmpegErrorDetail(sb);
+      expect(d, isNot(contains('ffmpeg version')));
+      expect(d, isNot(contains('built with')));
+      expect(d, isNot(contains('configuration:')));
+      expect(d, contains('Invalid data found when processing input'));
+    });
+
+    test('无横幅时原样保留内容并去掉空行', () {
+      final sb = StringBuffer('a\n\n\nb\n');
+      expect(MediaImportService.ffmpegErrorDetail(sb), 'a\nb');
+    });
+
+    test('超长输出截尾保留末尾', () {
+      final sb = StringBuffer('x' * 3000 + '|TAIL');
+      final d = MediaImportService.ffmpegErrorDetail(sb);
+      expect(d.endsWith('|TAIL'), isTrue);
+      expect(d.length, lessThanOrEqualTo(1200));
+    });
+  });
+
   test('deriveTitleFromMedia 去扩展名', () {
     expect(MediaImportService.deriveTitleFromMedia('/x/我的视频 [abc].mp4'),
         '我的视频 [abc]');

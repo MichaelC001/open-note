@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
@@ -371,7 +372,11 @@ class MediaImportService {
     _active.remove(process);
     _ensureAlive();
     if (code != 0) {
-      throw MediaImportException('音频提取失败', _tail(sbErr));
+      final err = sbErr.toString();
+      final logged =
+          err.length > 4000 ? err.substring(err.length - 4000) : err;
+      debugPrint('[MediaImport] ffmpeg 退出码 $code，stderr:\n$logged');
+      throw MediaImportException('音频提取失败', ffmpegErrorDetail(sbErr));
     }
     final wav = File(wavPath);
     if (!await wav.exists()) {
@@ -383,5 +388,21 @@ class MediaImportService {
   static String _tail(StringBuffer sb) {
     final s = sb.toString();
     return s.length > 2000 ? s.substring(s.length - 2000) : s;
+  }
+
+  /// 剥离 ffmpeg 启动横幅（version / built with / configuration 三行）与空行后
+  /// 取尾部（上限 1200 字符），让错误弹窗首行直接是真实报错而非横幅。
+  static String ffmpegErrorDetail(StringBuffer sb) {
+    final kept = sb
+        .toString()
+        .split('\n')
+        .map((l) => l.trimLeft())
+        .where((l) =>
+            l.isNotEmpty &&
+            !l.startsWith('ffmpeg version') &&
+            !l.startsWith('built with') &&
+            !l.startsWith('configuration:'))
+        .join('\n');
+    return kept.length > 1200 ? kept.substring(kept.length - 1200) : kept;
   }
 }

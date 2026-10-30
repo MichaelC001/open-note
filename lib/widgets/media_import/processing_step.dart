@@ -31,10 +31,18 @@ class ProcessingStep extends StatelessWidget {
           if (p.errorDetail != null)
             Padding(
               padding: const EdgeInsets.only(top: 8),
-              child: Text(p.errorDetail!,
-                  style: const TextStyle(fontSize: 11, color: Colors.grey),
-                  maxLines: 6,
-                  overflow: TextOverflow.ellipsis),
+              child: SelectionArea(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 160),
+                  child: SingleChildScrollView(
+                    child: Text(
+                      p.errorDetail!,
+                      style:
+                          const TextStyle(fontSize: 11, color: Colors.grey),
+                    ),
+                  ),
+                ),
+              ),
             ),
           const SizedBox(height: 12),
           OutlinedButton(
