@@ -127,7 +127,8 @@ class _FakeGpuDetector extends GpuCapabilityDetector {
   Future<GpuCapability> detect({bool force = false}) async => cap;
 }
 
-/// 记录 setWhisperGpuEnabled 调用的 spy provider（不触发真实重装联动）。
+/// 记录 setWhisperGpuEnabled 调用的 spy provider：走 super 真实链路
+/// （覆盖开关→探测触发）；fake 工具 whisperBuild 为空不会真实重装。
 class _SpyGpuProvider extends MediaImportProvider {
   int gpuToggleCalls = 0;
   bool? lastGpuToggleValue;
@@ -143,7 +144,7 @@ class _SpyGpuProvider extends MediaImportProvider {
   Future<void> setWhisperGpuEnabled(bool v) async {
     gpuToggleCalls++;
     lastGpuToggleValue = v;
-    await settings.setWhisperGpu(v);
+    await super.setWhisperGpuEnabled(v);
   }
 
   @override
@@ -618,7 +619,8 @@ void main() {
     }
   });
 
-  testWidgets('Mac：打开 GPU 开关触发一次 Metal 探测', (tester) async {
+  testWidgets('Mac：initState 触发一次 Metal 探测；开关从开到关不追加',
+      (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     try {
       final provider = makeSpyProvider(
@@ -626,10 +628,33 @@ void main() {
               _FakeGpuDetector(const GpuCapability(kind: GpuKind.metal)));
       await pumpTab(tester, provider);
 
-      await tester.tap(find.text('GPU 加速'));
+      expect(provider.probeCalls, 1, reason: 'initState 触发一次');
+      await tester.tap(find.text('GPU 加速')); // 默认开 → 点击为关操作
       await tester.pump();
 
-      expect(provider.probeCalls, 1);
+      expect(provider.probeCalls, 1, reason: '关操作不触发探测');
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('Mac：开关从关到开走生产链路触发 Metal 探测', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    try {
+      // 预置关：tap 时为真正的「开」操作，走 setWhisperGpuEnabled(true) 触发
+      SharedPreferences.setMockInitialValues({'media_whisper_gpu': false});
+      final provider = makeSpyProvider(
+          gpuDetector:
+              _FakeGpuDetector(const GpuCapability(kind: GpuKind.metal)));
+      await pumpTab(tester, provider);
+
+      final baseline = provider.probeCalls;
+      await tester.tap(find.text('GPU 加速'));
+      await tester.pumpAndSettle();
+
+      expect(provider.lastGpuToggleValue, isTrue, reason: '从关到开的开操作');
+      expect(provider.probeCalls, baseline + 1,
+          reason: 'setWhisperGpuEnabled(true) 应触发一次探测');
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }
